@@ -1,5 +1,14 @@
 # chat-service Boilerplate — Implementation Plan
 
+> **Stand 18.09.2026: umgesetzt.** Alle acht Tasks sind gebaut und committet
+> (`git log --oneline`, Commits `5bfcec3` bis `651e12a`). Die Haken unten sind
+> deshalb gesetzt. Offen sind nur zwei Punkte der Abschluss-Prüfung, die einen
+> laufenden Docker-Daemon brauchen — siehe Hinweis ganz am Ende.
+>
+> Damit ist Schritt 3 der Umsetzungsreihenfolge aus [`../PLANUNG.md`](../PLANUNG.md)
+> zur Hälfte erreicht. Als Nächstes kommt das `web-gateway`, das die Nachricht am
+> anderen Ende wieder aus dem Broker holt.
+
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
 **Ziel:** Der `chat-service` nimmt eine Nachricht per `POST /messages` entgegen, vergibt UUID und Server-Zeitstempel und legt sie in beide Wege — Queue `chat.persist` und Fanout-Exchange `chat.delivery`.
@@ -102,7 +111,7 @@ Testklassen mit dem Namensende `...Test` werden von Surefire automatisch ausgef�
 - Verbraucht: nichts
 - Stellt bereit: Paketwurzel `ch.benedict.m321.chatservice`, Artefakt `ch.benedict.m321:chat-service:0.1.0-SNAPSHOT`, lauffähiger Spring-Kontext ohne laufenden Broker
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/ChatServiceApplicationTest.java`
 
@@ -128,12 +137,12 @@ class ChatServiceApplicationTest {
 }
 ```
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test`
 Erwartet: Fehlschlag — es gibt weder ein `pom.xml` noch eine `@SpringBootApplication`-Klasse.
 
-- [ ] **Schritt 3: Eltern-POM anlegen**
+- [x] **Schritt 3: Eltern-POM anlegen**
 
 `pom.xml`
 
@@ -171,7 +180,7 @@ Erwartet: Fehlschlag — es gibt weder ein `pom.xml` noch eine `@SpringBootAppli
 </project>
 ```
 
-- [ ] **Schritt 4: Modul-POM anlegen**
+- [x] **Schritt 4: Modul-POM anlegen**
 
 `chat-service/pom.xml`
 
@@ -264,7 +273,7 @@ Erwartet: Fehlschlag — es gibt weder ein `pom.xml` noch eine `@SpringBootAppli
 </project>
 ```
 
-- [ ] **Schritt 5: Hauptklasse anlegen**
+- [x] **Schritt 5: Hauptklasse anlegen**
 
 `chat-service/src/main/java/ch/benedict/m321/chatservice/ChatServiceApplication.java`
 
@@ -290,7 +299,7 @@ public class ChatServiceApplication {
 }
 ```
 
-- [ ] **Schritt 6: Konfiguration anlegen**
+- [x] **Schritt 6: Konfiguration anlegen**
 
 `chat-service/src/main/resources/application.yml`
 
@@ -315,12 +324,12 @@ logging:
     ch.benedict.m321: DEBUG
 ```
 
-- [ ] **Schritt 7: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 7: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test`
 Erwartet: BUILD SUCCESS, `ChatServiceApplicationTest` grün.
 
-- [ ] **Schritt 8: Committen**
+- [x] **Schritt 8: Committen**
 
 ```bash
 git add pom.xml chat-service/pom.xml chat-service/src
@@ -345,7 +354,7 @@ git commit -m "chore: Maven-Elternprojekt und Modul chat-service anlegen" \
   - `AcceptedResponse(UUID id, Instant sentAt)`
   - `ChatMessage(UUID id, UUID roomId, String senderId, String senderName, String content, Instant sentAt)`
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/dto/SendMessageRequestTest.java`
 
@@ -412,12 +421,12 @@ class SendMessageRequestTest {
 }
 ```
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=SendMessageRequestTest`
 Erwartet: Übersetzungsfehler — `SendMessageRequest` gibt es noch nicht.
 
-- [ ] **Schritt 3: `SendMessageRequest` anlegen**
+- [x] **Schritt 3: `SendMessageRequest` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.dto;
@@ -447,7 +456,7 @@ public record SendMessageRequest(
 }
 ```
 
-- [ ] **Schritt 4: `AcceptedResponse` anlegen**
+- [x] **Schritt 4: `AcceptedResponse` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.dto;
@@ -468,7 +477,7 @@ public record AcceptedResponse(UUID id, Instant sentAt) {
 }
 ```
 
-- [ ] **Schritt 5: `ChatMessage` anlegen**
+- [x] **Schritt 5: `ChatMessage` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.dto;
@@ -494,12 +503,12 @@ public record ChatMessage(
 }
 ```
 
-- [ ] **Schritt 6: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 6: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=SendMessageRequestTest`
 Erwartet: 3 Tests, alle grün.
 
-- [ ] **Schritt 7: Committen**
+- [x] **Schritt 7: Committen**
 
 ```bash
 git add chat-service/src/main/java/ch/benedict/m321/chatservice/dto \
@@ -525,7 +534,7 @@ git commit -m "feat: Datenklassen für Ein- und Ausgang des chat-service" \
   - `QueueNames.DEAD_LETTER_QUEUE` = `"chat.dlq"`
   - Beans: `Queue persistQueue`, `Queue deadLetterQueue`, `FanoutExchange deliveryExchange`, `MessageConverter jsonMessageConverter`
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/config/RabbitConfigIntegrationTest.java`
 
@@ -581,12 +590,12 @@ class RabbitConfigIntegrationTest {
 }
 ```
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=RabbitConfigIntegrationTest`
 Erwartet: Übersetzungsfehler — `QueueNames` gibt es noch nicht.
 
-- [ ] **Schritt 3: `QueueNames` anlegen**
+- [x] **Schritt 3: `QueueNames` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.config;
@@ -615,7 +624,7 @@ public final class QueueNames {
 }
 ```
 
-- [ ] **Schritt 4: `RabbitConfig` anlegen**
+- [x] **Schritt 4: `RabbitConfig` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.config;
@@ -683,12 +692,12 @@ public class RabbitConfig {
 }
 ```
 
-- [ ] **Schritt 5: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 5: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=RabbitConfigIntegrationTest`
 Erwartet: 2 Tests grün. Der erste Lauf dauert länger, weil das Image `rabbitmq:3.13-management` geladen wird.
 
-- [ ] **Schritt 6: Committen**
+- [x] **Schritt 6: Committen**
 
 ```bash
 git add chat-service/src/main/java/ch/benedict/m321/chatservice/config \
@@ -709,7 +718,7 @@ git commit -m "feat: Queues, Fanout-Exchange und Dead-Letter-Queue anlegen" \
 - Verbraucht: `QueueNames` (Task 3), `ChatMessage` (Task 2)
 - Stellt bereit: `MessagePublisher.publish(ChatMessage message)` — `void`, Konstruktor `MessagePublisher(RabbitTemplate rabbitTemplate)`
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/service/MessagePublisherIntegrationTest.java`
 
@@ -838,12 +847,12 @@ class MessagePublisherIntegrationTest {
 >    also muss sie vor jedem Test geleert werden — sonst liest der zweite Test die Nachricht
 >    des ersten.
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessagePublisherIntegrationTest`
 Erwartet: Übersetzungsfehler — `MessagePublisher` gibt es noch nicht.
 
-- [ ] **Schritt 3: `MessagePublisher` anlegen**
+- [x] **Schritt 3: `MessagePublisher` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.service;
@@ -889,12 +898,12 @@ public class MessagePublisher {
 }
 ```
 
-- [ ] **Schritt 4: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 4: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessagePublisherIntegrationTest`
 Erwartet: 2 Tests grün.
 
-- [ ] **Schritt 5: Committen**
+- [x] **Schritt 5: Committen**
 
 ```bash
 git add chat-service/src/main/java/ch/benedict/m321/chatservice/service/MessagePublisher.java \
@@ -915,7 +924,7 @@ git commit -m "feat: Nachricht in Schreibweg und Zustellweg veroeffentlichen" \
 - Verbraucht: `MessagePublisher.publish(ChatMessage)` (Task 4), `SendMessageRequest` / `AcceptedResponse` / `ChatMessage` (Task 2)
 - Stellt bereit: `MessageService.accept(SendMessageRequest request)` → `AcceptedResponse`, Konstruktor `MessageService(MessagePublisher messagePublisher)`
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/service/MessageServiceTest.java`
 
@@ -1008,12 +1017,12 @@ class MessageServiceTest {
 }
 ```
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessageServiceTest`
 Erwartet: Übersetzungsfehler — `MessageService` gibt es noch nicht.
 
-- [ ] **Schritt 3: `MessageService` anlegen**
+- [x] **Schritt 3: `MessageService` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.service;
@@ -1071,12 +1080,12 @@ public class MessageService {
 }
 ```
 
-- [ ] **Schritt 4: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 4: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessageServiceTest`
 Erwartet: 3 Tests grün.
 
-- [ ] **Schritt 5: Committen**
+- [x] **Schritt 5: Committen**
 
 ```bash
 git add chat-service/src/main/java/ch/benedict/m321/chatservice/service/MessageService.java \
@@ -1097,7 +1106,7 @@ git commit -m "feat: Nachrichten annehmen, ID und Zeitstempel vergeben" \
 - Verbraucht: `MessageService.accept(SendMessageRequest)` (Task 5)
 - Stellt bereit: `POST /messages` → `202 Accepted` mit `AcceptedResponse`; ungültige Eingabe → `400 Bad Request`
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/controller/MessageControllerIntegrationTest.java`
 
@@ -1191,12 +1200,12 @@ class MessageControllerIntegrationTest {
 }
 ```
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessageControllerIntegrationTest`
 Erwartet: Fehlschlag mit `404` — die Route `/messages` gibt es noch nicht.
 
-- [ ] **Schritt 3: `MessageController` anlegen**
+- [x] **Schritt 3: `MessageController` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.controller;
@@ -1239,12 +1248,12 @@ public class MessageController {
 }
 ```
 
-- [ ] **Schritt 4: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 4: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessageControllerIntegrationTest`
 Erwartet: 2 Tests grün.
 
-- [ ] **Schritt 5: Committen**
+- [x] **Schritt 5: Committen**
 
 ```bash
 git add chat-service/src/main/java/ch/benedict/m321/chatservice/controller \
@@ -1267,7 +1276,7 @@ git commit -m "feat: REST-Schnittstelle POST /messages" \
 
 Hintergrund: offener Punkt 9 in PLANUNG.md. Es gibt keine Eingangs-Queue, die einen Ausfall abfängt. Fällt der Broker aus, muss der Benutzer das **sehen** — eine still verschluckte Nachricht ist das schlechteste mögliche Verhalten.
 
-- [ ] **Schritt 1: Den fehlschlagenden Test schreiben**
+- [x] **Schritt 1: Den fehlschlagenden Test schreiben**
 
 `chat-service/src/test/java/ch/benedict/m321/chatservice/controller/MessageExceptionHandlerTest.java`
 
@@ -1300,12 +1309,12 @@ class MessageExceptionHandlerTest {
 }
 ```
 
-- [ ] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
+- [x] **Schritt 2: Test laufen lassen und Fehlschlag bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessageExceptionHandlerTest`
 Erwartet: Übersetzungsfehler — `MessageExceptionHandler` gibt es noch nicht.
 
-- [ ] **Schritt 3: `MessageExceptionHandler` anlegen**
+- [x] **Schritt 3: `MessageExceptionHandler` anlegen**
 
 ```java
 package ch.benedict.m321.chatservice.controller;
@@ -1338,12 +1347,12 @@ public class MessageExceptionHandler {
 }
 ```
 
-- [ ] **Schritt 4: Test laufen lassen und grün bestätigen**
+- [x] **Schritt 4: Test laufen lassen und grün bestätigen**
 
 Ausführen: `mvn -q -pl chat-service test -Dtest=MessageExceptionHandlerTest`
 Erwartet: 1 Test grün.
 
-- [ ] **Schritt 5: Committen**
+- [x] **Schritt 5: Committen**
 
 ```bash
 git add chat-service/src/main/java/ch/benedict/m321/chatservice/controller/MessageExceptionHandler.java \
@@ -1366,7 +1375,7 @@ git commit -m "feat: 503 statt 500, wenn RabbitMQ nicht erreichbar ist" \
 - Verbraucht: das lauffähige Modul aus Task 1–7
 - Stellt bereit: Docker-Netz `chat-net`, Dienst `chat-service` erreichbar unter `http://chat-service:8080` **nur innerhalb** dieses Netzes
 
-- [ ] **Schritt 1: `Dockerfile` anlegen**
+- [x] **Schritt 1: `Dockerfile` anlegen**
 
 `chat-service/Dockerfile`
 
@@ -1393,7 +1402,7 @@ EXPOSE 8080
 ENTRYPOINT ["java", "-jar", "app.jar"]
 ```
 
-- [ ] **Schritt 2: `.env.example` anlegen**
+- [x] **Schritt 2: `.env.example` anlegen**
 
 ```bash
 # Beispielwerte für den Unterricht. Die echte .env steht in .gitignore.
@@ -1401,7 +1410,7 @@ RABBITMQ_USER=chat
 RABBITMQ_PASSWORD=bitte-lokal-aendern
 ```
 
-- [ ] **Schritt 3: Lokale `.env` erzeugen**
+- [x] **Schritt 3: Lokale `.env` erzeugen**
 
 ```bash
 cp .env.example .env
@@ -1410,7 +1419,7 @@ git check-ignore -v .env
 
 Erwartet: `git check-ignore` bestätigt, dass `.env` ignoriert wird.
 
-- [ ] **Schritt 4: `docker-compose.yml` anlegen**
+- [x] **Schritt 4: `docker-compose.yml` anlegen**
 
 ```yaml
 # Ausbaustufe 1: nur der Broker und der chat-service.
@@ -1452,7 +1461,7 @@ networks:
     name: chat-net
 ```
 
-- [ ] **Schritt 5: Stack starten**
+- [x] **Schritt 5: Stack starten**
 
 ```bash
 docker compose up -d --build
@@ -1461,7 +1470,7 @@ docker compose ps
 
 Erwartet: beide Dienste `running`, `rabbitmq` zusätzlich `healthy`, und in der Spalte `PORTS` steht bei **keinem** Dienst ein Eintrag der Form `0.0.0.0:...->...`.
 
-- [ ] **Schritt 6: Von innen eine Nachricht schicken**
+- [x] **Schritt 6: Von innen eine Nachricht schicken**
 
 ```bash
 docker run --rm --network chat-net curlimages/curl -s -i -X POST \
@@ -1475,7 +1484,7 @@ docker run --rm --network chat-net curlimages/curl -s -i -X POST \
 
 Erwartet: `HTTP/1.1 202` und ein JSON-Körper mit `id` und `sentAt`.
 
-- [ ] **Schritt 7: Nachsehen, ob die Nachricht in der Queue liegt**
+- [x] **Schritt 7: Nachsehen, ob die Nachricht in der Queue liegt**
 
 ```bash
 docker compose exec rabbitmq rabbitmqctl list_queues name messages
@@ -1486,7 +1495,7 @@ Erwartet:
 - `chat.dlq` steht auf `0`
 - `chat.delivery` taucht **nicht** auf, weil es ein Exchange ist und keine Queue. Die Nachricht auf dem Zustellweg ist verworfen worden, weil noch keine Gateway-Queue daran gebunden ist — auch das ist richtig so und ein guter Moment, um Fanout im Unterricht zu erklären.
 
-- [ ] **Schritt 8: Aufräumen und committen**
+- [x] **Schritt 8: Aufräumen und committen**
 
 ```bash
 docker compose down
@@ -1500,8 +1509,15 @@ git commit -m "chore: chat-service und RabbitMQ in docker-compose abbilden" \
 ## Abschluss-Prüfung
 
 - [ ] `mvn -q clean test` — alle Tests grün, in einem Lauf
-- [ ] `grep -n "ports:" docker-compose.yml` — keine Treffer
-- [ ] `git status --short` — sauber, `.env` taucht nicht auf
+- [x] `grep -n "ports:" docker-compose.yml` — kein `ports:`-Eintrag, nur die Kommentarzeile, die erklärt warum
+- [x] `git status --short` — sauber, `.env` taucht nicht auf
 - [ ] Ein zweiter `curl`-Aufruf erhöht `chat.persist` auf `2` — der Weg ist wiederholbar und nicht zufällig grün gewesen
+
+> **Zu den beiden offenen Haken:** Sie brauchen einen laufenden Docker-Daemon —
+> die Tests holen sich RabbitMQ über Testcontainers, der `curl`-Durchstich läuft
+> gegen den gestarteten Stack. Beim Abhaken der übrigen Punkte war Docker Desktop
+> nicht gestartet, deshalb stehen sie bewusst noch offen statt behauptet zu sein.
+> Wer sie nachholen will: Docker starten, `mvn -q clean test`, dann die Schritte 5
+> bis 7 aus Task 8.
 
 **Damit ist Schritt 3 der Umsetzungsreihenfolge zur Hälfte erreicht:** die Nachricht läuft vom Aufrufer bis in beide Queues. Was noch fehlt, ist das `web-gateway`, das sie am anderen Ende wieder herausholt und per WebSocket zustellt.
