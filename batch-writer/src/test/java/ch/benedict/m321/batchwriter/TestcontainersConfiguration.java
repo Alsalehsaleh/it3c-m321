@@ -5,6 +5,7 @@ import org.springframework.boot.testcontainers.service.connection.ServiceConnect
 import org.springframework.context.annotation.Bean;
 import org.testcontainers.containers.PostgreSQLContainer;
 import org.testcontainers.containers.RabbitMQContainer;
+import org.testcontainers.utility.MountableFile;
 
 /**
  * Die echten Gegenstellen für alle Tests: ein RabbitMQ und ein Postgres im Container.
@@ -24,10 +25,19 @@ class TestcontainersConfiguration {
         return new RabbitMQContainer("rabbitmq:3.13-management");
     }
 
-    /** Dasselbe Image wie in docker-compose.yml, damit Test und Stack übereinstimmen. */
+    /**
+     * Dasselbe Image wie in docker-compose.yml, und dasselbe Init-Skript.
+     *
+     * Testcontainers kopiert die Datei an die Stelle, an der das Postgres-Image beim
+     * ersten Start alle .sql-Dateien ausführt — genau wie docker compose es tut. Maven
+     * startet die Tests im Modulverzeichnis batch-writer/, deshalb "../".
+     */
     @Bean
     @ServiceConnection
     PostgreSQLContainer<?> postgresContainer() {
-        return new PostgreSQLContainer<>("postgres:17");
+        MountableFile schemaFile = MountableFile.forHostPath("../postgres/init/01-schema.sql");
+        PostgreSQLContainer<?> container = new PostgreSQLContainer<>("postgres:17");
+        container.withCopyFileToContainer(schemaFile, "/docker-entrypoint-initdb.d/01-schema.sql");
+        return container;
     }
 }
