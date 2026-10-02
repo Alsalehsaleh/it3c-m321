@@ -625,7 +625,8 @@ queues() {
 }
 
 # Nachrichten ueber den chat-service senden: send <Lauf> <Anzahl>
-# Der Lauf (S3, S4, ...) steht im Text, damit sich jeder Lauf einzeln zaehlen laesst.
+# Der Lauf (S3, S4, ...) und die Nummer stehen im Text, damit sich jede Nachricht
+# einzeln zaehlen laesst.
 send() {
   docker run --rm --network chat-net curlimages/curl:latest sh -c "
     for i in \$(seq 1 $2); do
@@ -633,10 +634,16 @@ send() {
         -H 'Content-Type: application/json' \
         -d '{\"roomId\":\"3f2b1c4e-0000-0000-0000-000000000001\",
              \"senderId\":\"anna\",\"senderName\":\"Anna Muster\",
-             \"content\":\"$1 Nachricht \$i\"}';
+             \"content\":\"$1 Nachricht '\$i'\"}';
     done"
 }
 ```
+
+Die Anführungszeichen um `\$i` sind Absicht: Der JSON-Text steht in einfachen
+Anführungszeichen, und darin setzt die Shell keine Variable ein. `'\$i'` schliesst sie
+kurz, damit die Nummer wirklich im Text landet. Ohne das hiessen alle Nachrichten
+«S6 Nachricht $i» — gefunden beim ersten Abnahmelauf, als die Textzählung in S6
+`1000|1` statt `1000|1000` ergab.
 
 `curlimages/curl` läuft **im Netz `chat-net`**, nicht auf dem Host. Damit muss für die
 Messung kein Port geöffnet werden — die Ein-Port-Vorgabe bleibt auch beim Prüfen intakt.
