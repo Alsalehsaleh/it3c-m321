@@ -8,7 +8,12 @@ import lombok.extern.slf4j.Slf4j;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
+import java.util.Collection;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 /**
  * Holt Stapel aus chat.persist und schreibt sie in die Datenbank.
@@ -33,7 +38,25 @@ public class PersistQueueListener {
      */
     @RabbitListener(queues = QueueNames.PERSIST_QUEUE, containerFactory = "batchContainerFactory")
     public void onBatch(List<ChatMessage> messages) {
-        int newRows = messageRepository.insertAll(messages);
-        log.info("Batch written: {} received, {} new", messages.size(), newRows);
+        List<ChatMessage> uniqueMessages = removeDuplicates(messages);
+        int newRows = messageRepository.insertAll(uniqueMessages);
+        log.info("Batch written: {} received, {} unique, {} new",
+                messages.size(), uniqueMessages.size(), newRows);
+    }
+
+    /**
+     * Erste Verteidigungslinie gegen Duplikate: Kommt dieselbe id im Stapel mehrfach vor,
+     * bleibt die erste übrig.
+     *
+     * Die zweite Linie ist ON CONFLICT in der Datenbank. Sie fängt Kopien in verschiedenen
+     * Stapeln ab, die diese Schleife nie zu sehen bekommt (Spec 3.2.2).
+     */
+    private List<ChatMessage> removeDuplicates(List<ChatMessage> messages) {
+        Map<UUID, ChatMessage> messagesById = new LinkedHashMap<>();
+        for (ChatMessage message : messages) {
+            messagesById.putIfAbsent(message.id(), message);
+        }
+        Collection<ChatMessage> uniqueMessages = messagesById.values();
+        return new ArrayList<>(uniqueMessages);
     }
 }
