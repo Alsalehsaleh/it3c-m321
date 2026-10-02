@@ -1,6 +1,5 @@
-# Ausbaustufe 1: nur der Broker und der chat-service.
-# Postgres, Keycloak, web-gateway und batch-writer kommen in den
-# folgenden Schritten dazu.
+# Ausbaustufe 2: Broker, chat-service, Postgres und batch-writer.
+# Keycloak und web-gateway kommen in den folgenden Schritten dazu.
 services:
 
   rabbitmq:
