@@ -16,6 +16,11 @@ spring:
     # Bewusst OHNE Vorgabewert: der Dienst soll sich nie still mit einem
     # eingebauten Passwort verbinden.
     password: ${POSTGRES_PASSWORD}
+    hikari:
+      # Ein Schreibversuch wartet höchstens 5 s auf eine Verbindung. Danach
+      # gilt er als gescheitert, und der Listener wartet und versucht es
+      # erneut (Spec 3.2.1).
+      connection-timeout: 5000
 
 logging:
   level:

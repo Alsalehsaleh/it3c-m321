@@ -75,6 +75,10 @@ public class RabbitConfig {
         factory.setPrefetchCount(BATCH_SIZE);
         factory.setReceiveTimeout(BATCH_TIMEOUT_MILLIS);
         factory.setBatchReceiveTimeout(BATCH_TIMEOUT_MILLIS);
+        // Was die Listener-Methode mit einer Exception verlässt, gilt als kaputte Nachricht:
+        // Der Stapel geht in die DLQ, statt endlos neu zugestellt zu werden. Einen
+        // Datenbankausfall fängt der Listener deshalb selbst ab (Spec 3.2.1).
+        factory.setDefaultRequeueRejected(false);
         return factory;
     }
 }

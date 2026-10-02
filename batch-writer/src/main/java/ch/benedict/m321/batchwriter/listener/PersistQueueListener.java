@@ -5,8 +5,11 @@ import ch.benedict.m321.batchwriter.dto.ChatMessage;
 import ch.benedict.m321.batchwriter.repository.MessageRepository;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import org.springframework.amqp.ImmediateRequeueAmqpException;
 import org.springframework.amqp.rabbit.annotation.RabbitListener;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Component;
+import org.springframework.transaction.TransactionException;
 
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,6 +30,12 @@ import java.util.UUID;
 @RequiredArgsConstructor
 public class PersistQueueListener {
 
+    /** Wartezeit vor dem zweiten Versuch, wenn die Datenbank nicht antwortet. */
+    private static final long FIRST_WAIT_MILLIS = 1000;
+
+    /** Länger als 10 s wird zwischen zwei Versuchen nie gewartet. */
+    private static final long MAX_WAIT_MILLIS = 10_000;
+
     private final MessageRepository messageRepository;
 
     /**
@@ -39,9 +48,59 @@ public class PersistQueueListener {
     @RabbitListener(queues = QueueNames.PERSIST_QUEUE, containerFactory = "batchContainerFactory")
     public void onBatch(List<ChatMessage> messages) {
         List<ChatMessage> uniqueMessages = removeDuplicates(messages);
-        int newRows = messageRepository.insertAll(uniqueMessages);
+        int newRows = writeUntilSuccessful(uniqueMessages);
         log.info("Batch written: {} received, {} unique, {} new",
                 messages.size(), uniqueMessages.size(), newRows);
+    }
+
+    /**
+     * Schreibt den Stapel und versucht es so lange erneut, bis die Datenbank ihn annimmt.
+     *
+     * Ein Datenbankfehler darf diese Methode nie verlassen: Der Container würde den Stapel
+     * sonst ablehnen, und er landete in der DLQ (defaultRequeueRejected = false). Ein Ausfall
+     * sagt aber nichts über die Nachrichten — also warten wir, statt wegzuwerfen
+     * (Spec 3.2.1). Die Wartezeit wächst: 1 s, 2 s, 4 s, 8 s, danach immer 10 s.
+     */
+    private int writeUntilSuccessful(List<ChatMessage> messages) {
+        long waitMillis = FIRST_WAIT_MILLIS;
+        int attempt = 1;
+        while (true) {
+            try {
+                return messageRepository.insertAll(messages);
+            } catch (DataAccessException | TransactionException exception) {
+                log.warn("Database not reachable (attempt {}), retrying {} messages in {} ms: {}",
+                        attempt, messages.size(), waitMillis, exception.getMessage());
+                waitBeforeNextAttempt(waitMillis);
+                waitMillis = nextWaitTime(waitMillis);
+                attempt = attempt + 1;
+            }
+        }
+    }
+
+    /**
+     * Wartet vor dem nächsten Versuch.
+     *
+     * Wird der Dienst während des Wartens beendet, kommt eine InterruptedException. Dann geht
+     * der Stapel zurück in die Queue: ImmediateRequeueAmqpException ist die eine Exception,
+     * bei der der Container trotz defaultRequeueRejected = false nicht in die DLQ ablehnt.
+     * Die Nachrichten sind ja nicht kaputt (Spec 3.2.1).
+     */
+    private void waitBeforeNextAttempt(long waitMillis) {
+        try {
+            Thread.sleep(waitMillis);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new ImmediateRequeueAmqpException("Interrupted while waiting for the database", exception);
+        }
+    }
+
+    /** Verdoppelt die Wartezeit, aber nie über 10 s hinaus. */
+    private long nextWaitTime(long waitMillis) {
+        long doubledWaitMillis = waitMillis * 2;
+        if (doubledWaitMillis > MAX_WAIT_MILLIS) {
+            return MAX_WAIT_MILLIS;
+        }
+        return doubledWaitMillis;
     }
 
     /**
