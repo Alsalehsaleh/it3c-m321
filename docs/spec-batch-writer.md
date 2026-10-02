@@ -4,7 +4,7 @@
 
 Der `batch-writer` ist der einzige Dienst, der in die Datenbank schreibt. Er holt
 Nachrichten aus der Queue `chat.persist`, sammelt sie zu Stapeln und schreibt jeden
-Stapel mit **einem** INSERT.
+Stapel in **einer** Transaktion.
 
 Dieses Dokument beschreibt, *was* der Dienst tun muss — nicht, in welcher Reihenfolge
 man ihn baut. Grundlage: [`../PLANUNG.md`](../PLANUNG.md) Abschnitt 3.6 (Ablauf),
@@ -30,8 +30,9 @@ der Datenbank steht. Das Speichern darf langsam sein, das Zustellen nicht.
 1. Er ist Verbraucher der Queue `chat.persist`.
 2. Er sammelt eingehende Nachrichten zu einem Stapel von **500 Stück oder 200 ms**,
    je nachdem, was zuerst eintritt.
-3. Er entdoppelt den Stapel nach `id` und schreibt ihn mit einem einzigen
-   `INSERT ... ON CONFLICT (id) DO NOTHING` in die Tabelle `message`.
+3. Er entdoppelt den Stapel nach `id` und schreibt ihn in **einer** Transaktion in die
+   Tabelle `message`: ein vorbereitetes `INSERT ... ON CONFLICT (id) DO NOTHING`, das
+   `JdbcTemplate.batchUpdate` für alle Nachrichten des Stapels gebündelt abschickt.
 4. Er bestätigt den Stapel gegenüber RabbitMQ **erst nach dem COMMIT**.
 5. Ist die Datenbank nicht erreichbar, wartet er und versucht es erneut, statt die
    Nachrichten abzulehnen.
@@ -164,6 +165,10 @@ steht auf `TypePrecedence.INFERRED`. Der Zieltyp wird also aus der **Signatur de
 Listener-Methode** abgeleitet, und `__TypeId__` wird ignoriert. Derselbe Mechanismus lässt
 S5 durch, wo der Header ganz fehlt.
 
+**Beleg:** nachgesehen im Bytecode von `spring-amqp` 3.2.12 (`javap -c`). Der Konstruktor
+von `DefaultJackson2JavaTypeMapper` setzt das Feld `typePrecedence` auf
+`TypePrecedence.INFERRED`.
+
 **Daraus folgen zwei Verbote für die Umsetzung:**
 
 1. `TypePrecedence` **nicht** auf `TYPE_ID` stellen und keinen `DefaultClassMapper` mit
@@ -195,8 +200,9 @@ chat.persist ──> Stapel sammeln ──> entdoppeln ──> ein INSERT ──
 
 **Die Stapelbildung übernimmt der Listener-Container**, nicht selbstgebauter Code:
 `SimpleRabbitListenerContainerFactory` mit `consumerBatchEnabled = true`,
-`batchSize = 500`, `batchReceiveTimeout = 200` (ms), `receiveTimeout = 200` (ms) und
-`prefetch = 500`. Die Listener-Methode bekommt dann eine fertige `List<ChatMessage>`.
+`batchSize = 500`, `batchReceiveTimeout = 200` (ms), `receiveTimeout = 200` (ms),
+`prefetch = 500` und `defaultRequeueRejected = false` (warum, steht in 3.2.1). Die
+Listener-Methode bekommt dann eine fertige `List<ChatMessage>`.
 
 Warum diese Werte zusammengehören:
 
@@ -211,10 +217,13 @@ Der Schreibvorgang selbst:
 
 1. Aus der Liste eine Abbildung `id → Nachricht` bauen und damit **innerhalb des Stapels
    entdoppeln**. Kommt dieselbe `id` zweimal im selben Stapel vor, bleibt eine übrig.
-2. Ein einziges `INSERT` mit `JdbcTemplate.batchUpdate` und dem Zusatz
-   `ON CONFLICT (id) DO NOTHING`.
-3. COMMIT.
-4. Rückkehr aus der Methode → der Container bestätigt den ganzen Stapel.
+2. Eine Transaktion öffnen — `@Transactional` an der Methode, die schreibt.
+3. Ein vorbereitetes `INSERT ... ON CONFLICT (id) DO NOTHING` für jede Nachricht des
+   Stapels, gebündelt mit `JdbcTemplate.batchUpdate` abgeschickt. Das ist **nicht** ein
+   einziges INSERT, sondern derselbe Befehl so oft, wie der Stapel Nachrichten hat — aber
+   in **einer** Transaktion. S4 zählt Transaktionen, nicht Befehle.
+4. COMMIT.
+5. Rückkehr aus der Methode → der Container bestätigt den ganzen Stapel.
 
 Kein JPA. `JdbcTemplate.batchUpdate` ist genau das, was hier gezeigt werden soll
 (PLANUNG.md §2.1).
@@ -228,6 +237,13 @@ Wartezeit: 1 s, 2 s, 4 s, 8 s, danach immer 10 s. Unbegrenzt. Er lehnt die Nachr
 **nie** ab und beendet sich nicht. Sobald die Datenbank antwortet, läuft der Stapel durch
 und wird bestätigt.
 
+**Was als Datenbankfehler zählt:** jede `DataAccessException` und jede
+`TransactionException` beim Schreiben. In diese beiden Familien übersetzt Spring alle
+Fehler von JDBC und Transaktion — auch «keine Verbindung», das beim Öffnen der Transaktion
+als `CannotCreateTransactionException` auftaucht. Ein Versuch wartet höchstens **5 s** auf
+eine Verbindung (`spring.datasource.hikari.connection-timeout`). Danach gilt er als
+gescheitert, und das Log zeigt eine Zeile mit der nächsten Wartezeit.
+
 **Warum so:** An `chat.persist` hängt eine Dead-Letter-Route
 ([`RabbitConfig.java:29-30`](../chat-service/src/main/java/ch/benedict/m321/chatservice/config/RabbitConfig.java#L29-L30)).
 Jede Ablehnung mit `requeue=false` schiebt die Nachricht sofort nach `chat.dlq` — und
@@ -240,6 +256,31 @@ Die Regel dahinter, und das ist der eigentliche Lehrsatz:
 
 Ein Datenbankausfall sagt nichts über die Nachricht aus. Sie erneut zuzustellen wird
 irgendwann gelingen. Warten ist deshalb richtig und Wegwerfen falsch.
+
+**Die Gegenstelle im Container:** Der Listener-Container läuft mit
+`defaultRequeueRejected = false`. Endet die Listener-Methode mit einer Exception, legt er
+den Stapel **nicht** zurück in die Queue, sondern lehnt ihn ab — er landet über die
+Dead-Letter-Route in `chat.dlq`. Das ist Absicht und macht die Regel im Code sichtbar: Was
+die Methode mit einem Fehler verlässt, gilt als kaputte Nachricht. Ein Datenbankfehler darf
+die Methode deshalb **nie** verlassen; sie wartet und versucht es selbst erneut.
+
+**Abweichung von PLANUNG.md §3.6, bewusst:** Die Planung sieht bei einem gescheiterten
+COMMIT «NACK mit requeue» vor. Wir warten stattdessen in der Listener-Methode:
+
+- Ein Requeue stellt denselben Stapel sofort wieder zu, ohne Wartezeit dazwischen, und
+  jeder Durchgang schreibt einen Stacktrace ins Log. Unsere Wartezeiten wachsen von 1 s
+  auf 10 s, und das Log zeigt eine Zeile pro Versuch.
+- Die Wiederholung steht als Schleife in unserem Code, die man vorlesen kann — nicht in
+  einer Voreinstellung des Containers, die man kennen muss.
+- Ein Requeue hängt an `defaultRequeueRejected = true`. Wer das umstellt, schickt bei
+  einem Datenbankausfall alles in die DLQ. Unsere Schleife ist von dieser Einstellung
+  unabhängig.
+
+**Wenn der Dienst beim Warten beendet wird:** Dann bricht die Wartepause mit einer
+`InterruptedException` ab. Der Listener wirft in diesem Fall eine
+`ImmediateRequeueAmqpException` — die eine Exception, bei der der Container trotz
+`defaultRequeueRejected = false` zurück in die Queue legt. Die Nachrichten sind ja nicht
+kaputt; sie gehen an eine andere Instanz oder an diese nach dem Neustart.
 
 **Was das kostet, offen benannt:** Bei dauerhaft toter Datenbank wartet der Dienst
 endlos. Sichtbar ist das nur im Log. Wir nehmen das in Kauf, weil die Alternative
@@ -267,9 +308,11 @@ und ist laut PLANUNG.md §3.7 Primärschlüssel der Tabelle.
 
 **Warum beide und nicht nur eine:** Die Datenbank allein würde reichen, aber nur unter
 einer Annahme über das Verhalten von Postgres bei zwei identischen Zeilen in **einem**
-INSERT — eine Annahme, die in diesem Projekt niemand nachgemessen hat. Die Entdopplung
-in Java kostet eine Schleife und macht die Annahme überflüssig. Umgekehrt reicht die
-Schleife allein nicht, sobald die Kopien in verschiedenen Stapeln liegen.
+Stapel. Die Entdopplung in Java kostet eine Schleife und macht die Annahme überflüssig;
+ausserdem zeigt das Log damit, wie viele Duplikate ein Stapel enthielt. Umgekehrt reicht
+die Schleife allein nicht, sobald die Kopien in verschiedenen Stapeln liegen. Gemessen
+wird die Annahme trotzdem: Der Test der schreibenden Klasse schickt zwei gleiche `id` im
+selben Stapel und erwartet genau eine Zeile.
 
 **Was ausdrücklich nicht passiert:** Kein `SELECT` vor dem Einfügen. Zwei Instanzen
 könnten gleichzeitig „gibt es nicht" lesen und beide einfügen — S6 würde damit
@@ -278,19 +321,34 @@ durchfallen.
 **Was wir damit nicht behaupten:** Exactly-once. Wir machen Duplikate harmlos, wir
 verhindern sie nicht (PLANUNG.md §3.6).
 
-#### 3.2.3 Eine Nachricht ist nicht lesbar
+#### 3.2.3 Eine Nachricht ist nicht lesbar oder unvollständig
 
-**Verhalten:** Sie wird abgelehnt und landet über die bestehende Dead-Letter-Route in
-`chat.dlq`. Der Stapel ringsum läuft normal weiter.
+**Verhalten:** Sie wird **einzeln** abgelehnt und landet über die bestehende
+Dead-Letter-Route in `chat.dlq`. Die übrigen Nachrichten desselben Stapels werden normal
+geschrieben.
 
-**Warum so:** Das ist das Gegenstück zu 3.2.1 und passiert von selbst — der
-`DefaultExceptionStrategy` von Spring AMQP zählt `MessageConversionException` zu den
-tödlichen Fehlern und lehnt ohne Requeue ab. Das ist genau richtig: Ein Wiederholen
-würde nichts ändern, weil die Nachricht selbst das Problem ist. Ohne diese Ausnahme
-gäbe es eine Endlosschleife.
+«Nicht lesbar» heisst: kein gültiges JSON. «Unvollständig» heisst: gültiges JSON, aber eines
+der sechs Felder aus 2.2 fehlt. Die eigene `ChatMessage` des `batch-writer` prüft in ihrem
+Konstruktor, dass kein Feld `null` ist. Jackson ruft diesen Konstruktor beim Einlesen auf.
+Fehlt ein Feld, scheitert die Umwandlung deshalb genau wie bei kaputtem JSON: mit einer
+`MessageConversionException`.
 
-**Für die Umsetzung heisst das: nichts tun.** Dieses Verhalten ist der Standard und darf
-nicht wegkonfiguriert werden.
+**Warum so:** Das ist das Gegenstück zu 3.2.1. Ein Wiederholen würde nichts ändern, weil
+die Nachricht selbst das Problem ist. Ohne die Prüfung im Konstruktor käme eine
+unvollständige Nachricht erst in der Datenbank zum Scheitern (`NOT NULL`) — und dort gilt
+nach 3.2.1 jeder Fehler als Ausfall, den man aussitzt. Ein einziges fehlendes Feld würde
+die Queue für immer blockieren.
+
+**Beleg, dass nur die eine Nachricht abgelehnt wird:** Im Bytecode von `spring-rabbit`
+3.2.12 (`javap -c`) fängt `BatchMessagingMessageListenerAdapter.onMessageBatch` die
+`MessageConversionException` **pro Nachricht** ab und ruft `basicReject(deliveryTag, false)`
+nur für diese eine auf. Ein eigener Test führt es zusätzlich am laufenden Broker vor.
+
+**Was bewusst offen bleibt:** Einen Fehler, den erst die Datenbank an einer vollständigen
+Nachricht findet — etwa das Zeichen `\u0000`, das PostgreSQL in `text` nicht speichern
+kann —, behandelt der Dienst nach 3.2.1 wie einen Ausfall und wiederholt den Stapel
+endlos, sichtbar im Log. Die richtige Stelle für diese Prüfung ist der `chat-service`, vor
+der Queue, wo man dem Absender noch antworten kann. Das gehört nicht zu dieser Aufgabe.
 
 #### 3.2.4 In der Queue liegt ein Rückstau — Szenario **S4**
 
@@ -321,6 +379,9 @@ instanzeigene Queue würde es zerstören — dann bekäme jede Instanz jede Nach
 Namen anlegen. Der Name ist fest `chat.persist`. Der Unterschied zum `web-gateway`, das
 genau umgekehrt arbeitet, ist in PLANUNG.md §3.5 beschrieben.
 
+Und der Dienst bekommt in `docker-compose.yml` **keinen** `container_name:`. Ein fester
+Containername lässt sich nur einmal vergeben; `--scale batch-writer=2` würde abbrechen.
+
 #### 3.2.6 Der Dienst stürzt mitten im Stapel ab
 
 **Verhalten:** Alles, was noch nicht bestätigt war, wird von RabbitMQ erneut zugestellt —
@@ -339,15 +400,23 @@ ist. Er beendet sich nicht.
 
 **Warum so:** In `docker compose up` starten alle Container fast gleichzeitig. Ein
 Dienst, der beim ersten Fehlversuch aufgibt, macht S2 zu einem Glücksspiel. Der
-`depends_on`-Eintrag mit `condition: service_healthy` deckt den Normalfall bereits ab;
-das Wiederverbinden deckt den Rest.
+`depends_on`-Eintrag mit `condition: service_healthy` für `rabbitmq` und `postgres` deckt
+den Normalfall bereits ab; das Wiederverbinden deckt den Rest. Für die Datenbank gilt
+dasselbe von selbst: Der Verbindungspool öffnet seine erste Verbindung erst beim ersten
+Stapel, und scheitert sie, greift 3.2.1.
 
 ### 3.3 Wann `chat.dlq` etwas enthält
 
-Nach den Entscheidungen oben gibt es **genau einen** Weg in die DLQ: eine Nachricht, die
-nicht nach `ChatMessage` lesbar ist (3.2.3). Datenbankausfälle führen nie dorthin, und
-Duplikate auch nicht. In S5 und S7 muss `chat.dlq` deshalb leer bleiben — das ist in
-Abschnitt 5 ein eigenes Messkriterium.
+Nach den Entscheidungen oben gibt es **zwei** Wege in die DLQ. Beide bedeuten «mit dieser
+Nachricht stimmt etwas nicht»:
+
+1. Die Nachricht ist nicht lesbar oder unvollständig (3.2.3).
+2. Die Listener-Methode bricht mit einem **unerwarteten** Fehler ab, also bei einem
+   Programmierfehler. Wegen `defaultRequeueRejected = false` (3.2.1) geht der Stapel dann
+   in die DLQ, statt endlos neu zugestellt zu werden. Verloren ist er dort nicht.
+
+Datenbankausfälle führen nie dorthin, Duplikate auch nicht. In S5 und S7 muss `chat.dlq`
+deshalb leer bleiben — das ist in Abschnitt 5 ein eigenes Messkriterium.
 
 ---
 
@@ -446,6 +515,15 @@ Migrationswerkzeug zum Einsatz.
 `CREATE TABLE IF NOT EXISTS` steht trotzdem im Skript, damit ein von Hand
 nachgeschobener Lauf nichts kaputt macht.
 
+**Wo die Daten liegen:** im benannten Volume `postgres-data`. Es überlebt
+`docker compose down`; erst `docker compose down -v` löscht es — und erst dann läuft das
+Init-Skript beim nächsten Start erneut.
+
+**Dieselbe Datei im Test:** Testcontainers kopiert `postgres/init/01-schema.sql` beim
+Start des Test-Postgres nach `/docker-entrypoint-initdb.d/`. Die Tests prüfen damit genau
+das Schema, das auch im Stack entsteht. Eine zweite Fassung, die auseinanderlaufen könnte,
+gibt es nicht.
+
 ### 4.3 Umgebungsvariablen
 
 Alle Werte kommen aus `.env`, die Beispielwerte stehen in `.env.example`
@@ -463,7 +541,9 @@ Alle Werte kommen aus `.env`, die Beispielwerte stehen in `.env.example`
 
 Die Defaults gelten beim Start **ausserhalb** von Docker, genau wie beim `chat-service`
 ([`application.yml:7-10`](../chat-service/src/main/resources/application.yml#L7-L10)).
-Im Compose-Netz wird `POSTGRES_HOST=postgres` und `RABBITMQ_HOST=rabbitmq` gesetzt.
+Im Compose-Netz setzt `docker-compose.yml` selbst `POSTGRES_HOST=postgres` und
+`RABBITMQ_HOST=rabbitmq`; diese beiden gehören nicht in `.env`. In `.env.example` kommen
+deshalb nur `POSTGRES_USER`, `POSTGRES_PASSWORD` und `POSTGRES_DB` neu dazu.
 
 Für `POSTGRES_PASSWORD` gibt es bewusst **keinen** Default: ein Dienst, der sich
 stillschweigend mit einem eingebauten Passwort verbindet, ist genau die Sorte Magie, die
@@ -474,8 +554,9 @@ mit `5672` genauso ([`application.yml:8`](../chat-service/src/main/resources/app
 
 ### 4.4 Feste Werte, die keine Umgebungsvariable werden
 
-`batchSize = 500`, `batchReceiveTimeout = 200`, `receiveTimeout = 200`, `prefetch = 500`
-und die Wartezeiten der Wiederholung stehen in der Konfiguration des Dienstes —
+`batchSize = 500`, `batchReceiveTimeout = 200`, `receiveTimeout = 200`, `prefetch = 500`,
+`defaultRequeueRejected = false`, die Wartezeiten der Wiederholung und die 5 s, die ein
+Versuch auf eine Datenbankverbindung wartet, stehen in der Konfiguration des Dienstes —
 **nicht** als Umgebungsvariable.
 
 Begründung: Niemand hat verlangt, sie im Betrieb zu ändern. Eine Stellschraube, die
@@ -484,19 +565,21 @@ will, ändert den Wert und baut neu.
 
 ### 4.5 Neue Abhängigkeiten
 
-Der Dienst braucht drei Einträge, die bisher in keinem `pom.xml` stehen. Die Versionen
-kommen aus dem Spring-Boot-Eltern-POM ([`pom.xml:14`](../pom.xml#L14)); es kommt also
+Der Dienst braucht vier Einträge, die bisher in keinem `pom.xml` stehen. Die Versionen
+kommen aus dem Spring-Boot-Eltern-POM ([`pom.xml:12`](../pom.xml#L12)); es kommt also
 keine eigene Versionsnummer ins Projekt.
 
 | Abhängigkeit | Wofür |
 |---|---|
 | `org.springframework.boot:spring-boot-starter-jdbc` | `JdbcTemplate` und der Verbindungspool |
+| `org.springframework.boot:spring-boot-starter-json` | Jackson samt Modul für `Instant`. Der `chat-service` bekommt es über `spring-boot-starter-web` mit; der `batch-writer` hat keinen Webserver und braucht es deshalb ausdrücklich |
 | `org.postgresql:postgresql` | Der Treiber, zur Laufzeit |
 | `org.testcontainers:postgresql` (Scope `test`) | Echte Datenbank im Test, passend zum RabbitMQ-Container, den der `chat-service` schon benutzt ([`chat-service/pom.xml:61-65`](../chat-service/pom.xml#L61-L65)) |
 
 Bereits im Projekt vorhanden und ebenfalls gebraucht: `spring-boot-starter-amqp`,
 `lombok`, `spring-boot-starter-test`, `spring-boot-testcontainers`,
-`org.testcontainers:junit-jupiter`.
+`org.testcontainers:rabbitmq`. Die Test-Container sind Spring-Beans in einer gemeinsamen
+Testkonfiguration; `org.testcontainers:junit-jupiter` wird dafür nicht gebraucht.
 
 **Nicht** gebraucht: `spring-boot-starter-web`. Der Dienst hat keine REST-Schnittstelle
 (1.3). Ohne den Starter fährt er als reine Anwendung ohne Webserver hoch — und kann
@@ -506,10 +589,15 @@ schon deshalb keinen Port öffnen.
 
 ## 5. Abnahmekriterien
 
-Vorbereitung für alle Messungen:
+Der Lehrer lässt die Szenarien **in dieser Reihenfolge auf demselben Stack laufen, ohne
+Aufräumen dazwischen.** Jede Zählung unten ist deshalb eine **Differenz** aus einem Wert
+vorher und einem Wert nachher, nie ein absoluter Wert: Nach S3 stehen bereits 1000 Zeilen
+in der Tabelle, und S4 muss trotzdem bestehen.
+
+Vorbereitung für alle Messungen (Git Bash oder eine Linux-Shell, im Wurzelverzeichnis):
 
 ```bash
-cp .env.example .env          # danach Passwoerter anpassen
+cp .env.example .env          # die Beispielwerte reichen; der Lehrer nimmt sie unverändert
 set -a; . ./.env; set +a      # POSTGRES_USER usw. in die Shell holen
 ```
 
@@ -523,21 +611,29 @@ psql_count() {
          -c "select count(*) from message;"
 }
 
+# Stand des Transaktionszaehlers der Datenbank
+xact_count() {
+  docker compose exec -T postgres \
+    psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A \
+         -c "select xact_commit from pg_stat_database where datname = current_database();"
+}
+
 # Tiefe der Queues und Zahl der Verbraucher
 queues() {
   docker compose exec -T rabbitmq \
     rabbitmqctl list_queues name messages consumers
 }
 
-# N Nachrichten ueber den chat-service senden
+# Nachrichten ueber den chat-service senden: send <Lauf> <Anzahl>
+# Der Lauf (S3, S4, ...) steht im Text, damit sich jeder Lauf einzeln zaehlen laesst.
 send() {
   docker run --rm --network chat-net curlimages/curl:latest sh -c "
-    for i in \$(seq 1 $1); do
+    for i in \$(seq 1 $2); do
       curl -s -o /dev/null -X POST http://chat-service:8080/messages \
         -H 'Content-Type: application/json' \
         -d '{\"roomId\":\"3f2b1c4e-0000-0000-0000-000000000001\",
              \"senderId\":\"anna\",\"senderName\":\"Anna Muster\",
-             \"content\":\"Nachricht \$i\"}';
+             \"content\":\"$1 Nachricht \$i\"}';
     done"
 }
 ```
@@ -552,34 +648,38 @@ mvn -q clean test
 echo "Exit-Code: $?"
 ```
 
-**Erfüllt, wenn:** Exit-Code `0`, und im Lauf sind Tests des Moduls `batch-writer`
-enthalten, die mindestens abdecken: ein Stapel wird geschrieben (3.1), eine doppelte `id`
-ergibt eine Zeile (3.2.2), ein Ausfall der Datenbank führt nicht zur Ablehnung (3.2.1).
+**Erfüllt, wenn:** Exit-Code `0`, und der Lauf enthält die Tests des Moduls `batch-writer`,
+die mindestens abdecken: ein Stapel wird geschrieben (3.1), ein Rückstau kostet wenige
+Transaktionen (3.2.4), eine doppelte `id` ergibt eine Zeile (3.2.2), ein Ausfall der
+Datenbank führt nicht zur Ablehnung (3.2.1), eine kaputte Nachricht landet einzeln in der
+DLQ (3.2.3).
 
 ### S2 — frischer Klon startet, kein Dienst veröffentlicht einen Port
 
 ```bash
 docker compose up -d --build
 docker compose ps --format '{{.Service}}\t{{.Status}}\t{{.Ports}}'
-grep -n "ports:" docker-compose.yml
-docker compose port batch-writer 8080 ; echo "Exit-Code: $?"
+docker compose ps --format '{{.Ports}}' | grep -c -- '->'      # erwartet: 0
+grep -nE '^[[:space:]]+ports:' docker-compose.yml ; echo "Exit-Code: $?"   # erwartet: 1
 ```
 
-**Erfüllt, wenn:** alle Dienste `running` bzw. `healthy` sind, die Spalte `Ports` **keine**
-Zuordnung der Form `0.0.0.0:...->...` zeigt, `grep` keinen echten `ports:`-Eintrag findet
-(die erklärende Kommentarzeile in [`../docker-compose.yml`](../docker-compose.yml) zählt
-nicht) und `docker compose port` mit einem Fehler endet, weil nichts veröffentlicht ist.
+**Erfüllt, wenn:** alle Dienste `running` bzw. `healthy` sind, keine Zeile der Spalte
+`Ports` eine Zuordnung der Form `0.0.0.0:...->...` enthält (Zählung `0`) und `grep` in
+`docker-compose.yml` keinen `ports:`-Schlüssel findet (Exit-Code `1`). Die erklärende
+Kommentarzeile beginnt mit `#` und zählt nicht.
 
 ### S3 — 1000 Nachrichten sind nach spätestens 60 s in der Tabelle
 
 ```bash
-send 1000
+VORHER=$(psql_count)
+send S3 1000
 sleep 60
-psql_count          # erwartet: 1000
-queues              # erwartet: chat.persist -> 0 Nachrichten
+NACHHER=$(psql_count)
+echo "Neue Zeilen: $((NACHHER - VORHER))"   # erwartet: 1000
+queues                                       # erwartet: chat.persist -> 0
 ```
 
-**Erfüllt, wenn:** `psql_count` genau `1000` liefert und `chat.persist` bei `0`
+**Erfüllt, wenn:** genau `1000` neue Zeilen dazugekommen sind und `chat.persist` bei `0`
 Nachrichten steht.
 
 ### S4 — Rückstau wird in höchstens 100 Transaktionen geschrieben
@@ -600,32 +700,31 @@ gekostet hat. Nur dieser Wert wird gegen die Grenze von 100 geprüft.
 ```bash
 docker compose stop batch-writer
 
-XACT_VORHER=$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  -t -A -c "select xact_commit from pg_stat_database where datname = current_database();")
+VORHER=$(psql_count)
+XACT_VORHER=$(xact_count)
 
-send 1000
+send S4 1000
 queues                          # erwartet: chat.persist -> 1000, consumers -> 0
 
 docker compose start batch-writer
 sleep 30
 
-XACT_NACHHER=$(docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" \
-  -t -A -c "select xact_commit from pg_stat_database where datname = current_database();")
-
-psql_count                                              # erwartet: 1000
-echo "Transaktionen: $((XACT_NACHHER - XACT_VORHER))"   # erwartet: deutlich unter 100
+XACT_NACHHER=$(xact_count)
+NACHHER=$(psql_count)
+echo "Neue Zeilen:   $((NACHHER - VORHER))"             # erwartet: 1000
+echo "Transaktionen: $((XACT_NACHHER - XACT_VORHER))"   # erwartet: höchstens 100
 ```
 
-**Erfüllt, wenn:** `psql_count` genau `1000` liefert und die Differenz
-`XACT_NACHHER - XACT_VORHER` **höchstens 100** beträgt. Erwartet werden rund 2 bis 5.
-Genau `2` wird es nie: In die Differenz zählen auch die Transaktionen der `psql`-Aufrufe
-selbst und alles, was Postgres nebenher committet. Das ist der Grund, warum die Grenze
-bei 100 liegt und nicht bei 2 — sie prüft die Grössenordnung, nicht die exakte Zahl.
+**Erfüllt, wenn:** genau `1000` neue Zeilen dazugekommen sind und die Differenz
+`XACT_NACHHER - XACT_VORHER` **höchstens 100** beträgt. Erwartet wird eine Zahl weit
+darunter: zwei Stapel-Transaktionen plus die Prüfabfragen des Verbindungspools und die
+Abfrage der Messung selbst. Genau `2` wird es deshalb nie — die Grenze von 100 prüft die
+Grössenordnung, nicht die exakte Zahl.
 
 ### S5 — dieselbe Nachricht zweimal ergibt eine Zeile
 
-Zweimal dieselbe Nutzlast direkt in `chat.persist` legen, nur mit
-`content_type: application/json` und **ohne** `__TypeId__`:
+Zweimal dieselbe Nutzlast direkt in `chat.persist` legen — wie beim Lehrer **nur** mit
+`content_type: application/json`, also ohne `__TypeId__` und ohne weitere Properties:
 
 ```bash
 VORHER=$(psql_count)
@@ -635,7 +734,7 @@ for versuch in 1 2; do
     -s -u "$RABBITMQ_USER:$RABBITMQ_PASSWORD" \
     -H 'Content-Type: application/json' \
     -X POST 'http://rabbitmq:15672/api/exchanges/%2F/amq.default/publish' \
-    -d '{"properties":{"content_type":"application/json","delivery_mode":2},
+    -d '{"properties":{"content_type":"application/json"},
          "routing_key":"chat.persist",
          "payload":"{\"id\":\"11111111-2222-3333-4444-555555555555\",\"roomId\":\"3f2b1c4e-0000-0000-0000-000000000001\",\"senderId\":\"anna\",\"senderName\":\"Anna Muster\",\"content\":\"Doppelt\",\"sentAt\":\"2026-09-25T09:14:02.471Z\"}",
          "payload_encoding":"string"}'
@@ -645,12 +744,14 @@ sleep 5
 
 docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A \
   -c "select count(*) from message where id = '11111111-2222-3333-4444-555555555555';"
-queues        # erwartet: chat.dlq -> 0
-psql_count    # erwartet: genau 1 mehr als $VORHER
+queues                                       # erwartet: chat.dlq -> 0
+NACHHER=$(psql_count)
+echo "Neue Zeilen: $((NACHHER - VORHER))"   # erwartet: 1
 ```
 
 **Erfüllt, wenn:** die Zählung auf die `id` genau `1` liefert, `chat.dlq` bei `0` steht
-und `psql_count` gegenüber `$VORHER` um genau `1` gestiegen ist.
+und genau `1` neue Zeile dazugekommen ist. Die feste `id` macht den Versuch einmal pro
+Stack aussagekräftig; ein zweiter Lauf auf demselben Stack fände sie schon vor.
 
 Die Management-API auf Port `15672` ist **nur im Netz `chat-net`** erreichbar; für diese
 Messung wird sie nicht nach aussen veröffentlicht.
@@ -659,62 +760,89 @@ Messung wird sie nicht nach aussen veröffentlicht.
 
 ```bash
 docker compose up -d --scale batch-writer=2
-sleep 10
-queues              # erwartet: chat.persist -> consumers = 2
+sleep 15
+queues                                       # erwartet: chat.persist -> consumers = 2
 
-send 1000
+VORHER=$(psql_count)
+send S6 1000
 sleep 60
+NACHHER=$(psql_count)
+echo "Neue Zeilen: $((NACHHER - VORHER))"   # erwartet: 1000
 
-psql_count          # erwartet: 1000
 docker compose exec -T postgres psql -U "$POSTGRES_USER" -d "$POSTGRES_DB" -t -A \
-  -c "select count(*) - count(distinct id) from message;"   # erwartet: 0
+  -c "select count(*), count(distinct content) from message where content like 'S6 %';"
+                                             # erwartet: 1000|1000
+
+docker compose logs batch-writer | grep "Batch written" | cut -d'|' -f1 | sort | uniq -c
+                                             # erwartet: beide Instanzen tauchen auf
 ```
 
-**Erfüllt, wenn:** `consumers` für `chat.persist` genau `2` ist, `psql_count` `1000`
-liefert und die Differenz aus Zeilen und verschiedenen `id` genau `0` ist.
+**Erfüllt, wenn:** `consumers` für `chat.persist` genau `2` ist, genau `1000` neue Zeilen
+dazugekommen sind und jeder Text des Laufs genau einmal vorkommt (`1000|1000`). Dieselbe
+Nachricht zweimal kann es wegen des Primärschlüssels auf `id` ohnehin nicht geben; die
+Zählung über den Text zeigt, dass jede gesendete Nachricht genau einmal ankam. Die letzte
+Zeile zeigt zusätzlich, dass wirklich beide Instanzen geschrieben haben.
 
 ### S7 — Datenbankausfall wird ausgesessen, ohne Neustart von Hand
 
 ```bash
-NEUSTARTS_VORHER=$(docker inspect -f '{{.RestartCount}}' \
-  "$(docker compose ps -q batch-writer)")
+docker compose ps -q batch-writer | xargs docker inspect -f '{{.Name}} {{.RestartCount}} {{.State.StartedAt}}'
+VORHER=$(psql_count)
 
 docker compose stop postgres
-send 300
+send S7 300
 sleep 15
 docker compose start postgres
 sleep 90
 
-psql_count          # erwartet: 300 mehr als vor dem Versuch
-queues              # erwartet: chat.persist -> 0, chat.dlq -> 0
-
-docker inspect -f '{{.RestartCount}}' "$(docker compose ps -q batch-writer)"
-docker compose ps batch-writer          # erwartet: durchgehend "running"
+NACHHER=$(psql_count)
+echo "Neue Zeilen: $((NACHHER - VORHER))"   # erwartet: 300
+queues                                       # erwartet: chat.persist -> 0, chat.dlq -> 0
+docker compose ps -q batch-writer | xargs docker inspect -f '{{.Name}} {{.RestartCount}} {{.State.StartedAt}}'
+                                             # erwartet: dieselben Werte wie vorher
+docker compose logs batch-writer | grep -c "retrying"   # erwartet: mehr als 0
 ```
 
-**Erfüllt, wenn:** alle 300 Nachrichten in der Tabelle stehen, `chat.dlq` bei `0` bleibt,
-der `RestartCount` unverändert gegenüber `$NEUSTARTS_VORHER` ist und niemand den Dienst
-von Hand angefasst hat.
+**Erfüllt, wenn:** genau `300` neue Zeilen dazugekommen sind, `chat.dlq` bei `0` bleibt,
+`RestartCount` und `StartedAt` jeder Instanz unverändert sind und niemand den Dienst von
+Hand angefasst hat. Die letzte Zeile zeigt, dass der Dienst den Ausfall bemerkt und
+gewartet hat.
 
 ### S8 — Quelltext hält sich an die Projektregeln, `.env` ist nicht im Repo
 
 ```bash
-git ls-files batch-writer/
-git ls-files --error-unmatch .env ; echo "Exit-Code: $?"   # erwartet: Fehler
+# 1. Keine Streams und keine forEach-Lambdas — erwartet: keine Ausgabe
+grep -rnE '\.stream\(|Stream\.|Collectors|\.forEach\(' batch-writer/src
+
+# 2. Ein Kommentar direkt über jeder Klasse und jeder Methode, Annotationen dazwischen
+#    sind erlaubt — erwartet: keine Ausgabe
+awk '
+  /^[[:space:]]*@/ { next }
+  {
+    isType   = ($0 ~ /^(public |final |abstract )*(class|record|interface|enum) /)
+    isMethod = ($0 ~ /^    [A-Za-z][^=;]*[(]/ && $0 !~ /;[[:space:]]*$/) || ($0 ~ /^    public [A-Z][A-Za-z0-9]* [{]/)
+    if ((isType || isMethod) && prev !~ /[*]\/[[:space:]]*$/) print FILENAME ":" FNR ": " $0
+    prev = $0
+  }' $(git ls-files 'batch-writer/*.java')
+
+# 3. .env ist nicht versioniert und wird ignoriert
+git ls-files --error-unmatch .env ; echo "Exit-Code: $?"   # erwartet: Fehler, Exit-Code 1
 git check-ignore -v .env                                    # erwartet: Treffer in .gitignore
-grep -rn "password\|secret" batch-writer/src/main/resources/
+grep -rn "password\|secret" batch-writer/src/main/resources/  # erwartet: nur Platzhalter
 ```
 
 **Erfüllt, wenn:**
 
+- die ersten beiden Befehle nichts ausgeben,
 - `git ls-files --error-unmatch .env` **fehlschlägt** (die Datei ist nicht versioniert)
-  und `git check-ignore` sie in [`.gitignore:17`](../.gitignore#L17) nachweist.
-- Die `grep`-Suche keine echten Werte findet, sondern nur Platzhalter der Form
+  und `git check-ignore` sie in [`.gitignore:17`](../.gitignore#L17) nachweist,
+- die `grep`-Suche keine echten Werte findet, sondern nur Platzhalter der Form
   `${POSTGRES_PASSWORD}`.
-- Beim Durchlesen des Quelltextes gilt, was [`../CLAUDE.md`](../CLAUDE.md) verlangt:
-  Bezeichner und Log-Meldungen auf Englisch, Kommentare auf Deutsch; ein Ergebnis pro
-  Zeile statt verschachtelter Aufrufe; `for`-Schleife statt Stream; jede Klasse und jede
-  Methode mit einem Kommentar, der das *Warum* erklärt; sprechende Namen
-  (`messageRepository`, nicht `repo`); keine Interfaces mit einer einzigen
-  Implementierung; `@Slf4j` und `@RequiredArgsConstructor` statt handgeschriebener
-  Logger und Konstruktoren; `record` für Datenklassen.
+
+Der zweite Befehl ist eine Näherung: Er erkennt Klassen am Zeilenanfang und Methoden an
+vier Leerzeichen Einzug — so, wie der Code formatiert ist. Was kein Befehl prüfen kann,
+prüft das Durchlesen, und es gilt, was [`../CLAUDE.md`](../CLAUDE.md) verlangt:
+Bezeichner und Log-Meldungen auf Englisch, Kommentare auf Deutsch; ein Ergebnis pro Zeile
+statt verschachtelter Aufrufe; sprechende Namen (`messageRepository`, nicht `repo`); keine
+Interfaces mit einer einzigen Implementierung; `@Slf4j` und `@RequiredArgsConstructor`
+statt handgeschriebener Logger und Konstruktoren; `record` für Datenklassen.
