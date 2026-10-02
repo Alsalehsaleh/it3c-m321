@@ -1,7 +1,11 @@
 # batch-writer — Umsetzungsplan
 
-> **Stand 02.10.2026:** Plan geschrieben, Umsetzung beginnt. Eine Aufgabe wird erst
-> abgehakt, wenn ihr Commit im `git log` steht.
+> **Stand 02.10.2026: umgesetzt und abgenommen.** Alle zwölf Aufgaben sind gebaut und
+> committet (`git log --oneline`, Commits `e566e46` bis `980220c`); jede Betreffzeile
+> steht genau so unten bei ihrer Aufgabe. Die Abschluss-Prüfung lief auf einem frischen
+> Klon mit `.env` aus `.env.example`, alle acht Szenarien in Reihenfolge auf demselben
+> Stack — die gemessenen Werte stehen ganz unten. Zwei Funde aus dieser Prüfung sind in
+> eigenen Commits behoben, siehe «Abweichungen vom Plan».
 
 **Ziel:** Der `batch-writer` holt Nachrichten aus der Queue `chat.persist`, schreibt sie
 stapelweise in die Tabelle `message` und bestätigt erst nach dem COMMIT. Er übersteht
@@ -107,12 +111,12 @@ entschärft, bevor sie zuschnappt.
 Aufgabe 2: Dort baut es auch dann noch, wenn das Eltern-POM ein Modul nennt, das nicht im
 Build liegt.
 
-- [ ] **Schritt 1: Build-Befehl umstellen** — statt `mvn -pl chat-service -am package`
+- [x] **Schritt 1: Build-Befehl umstellen** — statt `mvn -pl chat-service -am package`
   baut der Build mit `mvn -q -f chat-service/pom.xml package -DskipTests` nur das eigene
   Modul. Das Eltern-POM wird dabei nur für die gemeinsamen Einstellungen gelesen, seine
   Modulliste spielt keine Rolle. Ein Kommentar im Dockerfile erklärt das.
-- [ ] **Schritt 2: Prüfen** — `docker compose build chat-service` läuft durch.
-- [ ] **Schritt 3: Committen** — `chore: chat-service-Image unabhängig von der Modulliste bauen`
+- [x] **Schritt 2: Prüfen** — `docker compose build chat-service` läuft durch.
+- [x] **Schritt 3: Committen** — `chore: chat-service-Image unabhängig von der Modulliste bauen`
 
 ---
 
@@ -134,14 +138,14 @@ fährt mit echtem RabbitMQ und echtem Postgres hoch. Die beiden Container sind S
 in `TestcontainersConfiguration`; alle Integrationstests erben über `IntegrationTestBase`
 denselben Kontext und starten die Container deshalb nur einmal.
 
-- [ ] **Schritt 1: Test und Testkonfiguration schreiben**
-- [ ] **Schritt 2: Test rot sehen** — `mvn -q -pl batch-writer test` scheitert, weil es das
+- [x] **Schritt 1: Test und Testkonfiguration schreiben**
+- [x] **Schritt 2: Test rot sehen** — `mvn -q -pl batch-writer test` scheitert, weil es das
   Modul noch nicht gibt.
-- [ ] **Schritt 3: Modul anlegen** — Abhängigkeiten nach Spec 4.5, Hauptklasse,
+- [x] **Schritt 3: Modul anlegen** — Abhängigkeiten nach Spec 4.5, Hauptklasse,
   `application.yml` mit den Variablen aus Spec 4.3.
-- [ ] **Schritt 4: Test grün sehen** — `mvn -q -pl batch-writer test`. Zusätzlich
+- [x] **Schritt 4: Test grün sehen** — `mvn -q -pl batch-writer test`. Zusätzlich
   `docker compose build chat-service`: baut weiterhin (Nachweis für Aufgabe 1).
-- [ ] **Schritt 5: Committen** — `chore: Maven-Modul batch-writer anlegen`
+- [x] **Schritt 5: Committen** — `chore: Maven-Modul batch-writer anlegen`
 
 ---
 
@@ -163,11 +167,11 @@ festgenagelt, und zwar so, wie die Nachricht wirklich auf der Leitung liegt.
 - JSON ohne `content` führt zu einer `MessageConversionException`.
 - Kaputtes JSON führt zu einer `MessageConversionException`.
 
-- [ ] **Schritt 1: Test schreiben**
-- [ ] **Schritt 2: Test rot sehen** — kompiliert nicht, weil `ChatMessage` fehlt.
-- [ ] **Schritt 3: `ChatMessage` anlegen**
-- [ ] **Schritt 4: Test grün sehen** — `-Dtest=ChatMessageConversionTest`
-- [ ] **Schritt 5: Committen** — `feat: Datenklasse ChatMessage als eigene Kopie des Vertrags`
+- [x] **Schritt 1: Test schreiben**
+- [x] **Schritt 2: Test rot sehen** — kompiliert nicht, weil `ChatMessage` fehlt.
+- [x] **Schritt 3: `ChatMessage` anlegen**
+- [x] **Schritt 4: Test grün sehen** — `-Dtest=ChatMessageConversionTest`
+- [x] **Schritt 5: Committen** — `feat: Datenklasse ChatMessage als eigene Kopie des Vertrags`
 
 ---
 
@@ -187,11 +191,11 @@ später `docker compose`.
 PLANUNG.md §3.7 mit den richtigen Typen, alle `NOT NULL`. Es gibt den Primärschlüssel auf
 `id` und den Index `idx_message_room_sent` auf `(room_id, sent_at DESC)`.
 
-- [ ] **Schritt 1: Test schreiben**
-- [ ] **Schritt 2: Test rot sehen** — die Tabelle fehlt.
-- [ ] **Schritt 3: Skript anlegen und im Test-Postgres einhängen**
-- [ ] **Schritt 4: Test grün sehen** — `-Dtest=SchemaIntegrationTest`
-- [ ] **Schritt 5: Committen** — `feat: Tabelle message als Init-Skript für Postgres`
+- [x] **Schritt 1: Test schreiben**
+- [x] **Schritt 2: Test rot sehen** — die Tabelle fehlt.
+- [x] **Schritt 3: Skript anlegen und im Test-Postgres einhängen**
+- [x] **Schritt 4: Test grün sehen** — `-Dtest=SchemaIntegrationTest`
+- [x] **Schritt 5: Committen** — `feat: Tabelle message als Init-Skript für Postgres`
 
 ---
 
@@ -214,11 +218,11 @@ davorzuschalten.
 - Eine `id`, die schon in der Tabelle steht, wird in einem späteren Stapel übergangen;
   die Rückgabe zählt nur die neuen Zeilen.
 
-- [ ] **Schritt 1: Test schreiben**
-- [ ] **Schritt 2: Test rot sehen** — kompiliert nicht, weil `MessageRepository` fehlt.
-- [ ] **Schritt 3: `MessageRepository` anlegen**
-- [ ] **Schritt 4: Test grün sehen** — `-Dtest=MessageRepositoryIntegrationTest`
-- [ ] **Schritt 5: Committen** — `feat: Stapel in einer Transaktion mit ON CONFLICT schreiben`
+- [x] **Schritt 1: Test schreiben**
+- [x] **Schritt 2: Test rot sehen** — kompiliert nicht, weil `MessageRepository` fehlt.
+- [x] **Schritt 3: `MessageRepository` anlegen**
+- [x] **Schritt 4: Test grün sehen** — `-Dtest=MessageRepositoryIntegrationTest`
+- [x] **Schritt 5: Committen** — `feat: Stapel in einer Transaktion mit ON CONFLICT schreiben`
 
 ---
 
@@ -236,11 +240,11 @@ ist es sinnvoll, die Queue anzuschliessen. Ab hier funktioniert der Hauptweg (S3
 **Was der Test prüft:** 1000 Nachrichten in `chat.persist` stehen nach spätestens 60 s als
 1000 Zeilen in der Tabelle, und die Queue ist leer.
 
-- [ ] **Schritt 1: Test schreiben**
-- [ ] **Schritt 2: Test rot sehen** — kompiliert nicht, weil `QueueNames` fehlt.
-- [ ] **Schritt 3: Konfiguration und Listener anlegen**
-- [ ] **Schritt 4: Test grün sehen** — `-Dtest=PersistQueueIntegrationTest`
-- [ ] **Schritt 5: Committen** — `feat: Nachrichten stapelweise aus chat.persist in die Datenbank schreiben`
+- [x] **Schritt 1: Test schreiben**
+- [x] **Schritt 2: Test rot sehen** — kompiliert nicht, weil `QueueNames` fehlt.
+- [x] **Schritt 3: Konfiguration und Listener anlegen**
+- [x] **Schritt 4: Test grün sehen** — `-Dtest=PersistQueueIntegrationTest`
+- [x] **Schritt 5: Committen** — `feat: Nachrichten stapelweise aus chat.persist in die Datenbank schreiben`
 
 ---
 
@@ -258,11 +262,11 @@ bevor weiter darauf gebaut wird.
 `xact_commit` ablesen, Listener starten, warten, bis alle 1000 Zeilen da sind,
 `xact_commit` erneut ablesen. Die Differenz ist höchstens 100.
 
-- [ ] **Schritt 1: Test schreiben**
-- [ ] **Schritt 2: Test grün sehen** — `-Dtest=BacklogIntegrationTest`. Ein rotes Vorher
+- [x] **Schritt 1: Test schreiben**
+- [x] **Schritt 2: Test grün sehen** — `-Dtest=BacklogIntegrationTest`. Ein rotes Vorher
   gibt es hier nicht, weil der Test bestehendes Verhalten nachweist. Zur Gegenprobe einmal
   mit `batchSize = 1` laufen lassen: dann muss er rot werden.
-- [ ] **Schritt 3: Committen** — `test: Rückstau wird in wenigen Transaktionen geschrieben`
+- [x] **Schritt 3: Committen** — `test: Rückstau wird in wenigen Transaktionen geschrieben`
 
 ---
 
@@ -284,11 +288,11 @@ Danach steht genau eine Zeile in der Tabelle, und `chat.dlq` ist leer.
 aus Aufgabe 5 das Duplikat abfängt. Er weist S5 nach, treibt aber die Schleife nicht. Die
 Schleife ist die Entscheidung aus Spec 3.2.2.
 
-- [ ] **Schritt 1: Test schreiben und laufen lassen** — `-Dtest=DuplicateMessageIntegrationTest`
-- [ ] **Schritt 2: `removeDuplicates` einbauen** — mit Log-Zeile, wie viele Nachrichten ein
+- [x] **Schritt 1: Test schreiben und laufen lassen** — `-Dtest=DuplicateMessageIntegrationTest`
+- [x] **Schritt 2: `removeDuplicates` einbauen** — mit Log-Zeile, wie viele Nachrichten ein
   Stapel hatte und wie viele davon verschieden waren.
-- [ ] **Schritt 3: Test grün sehen**
-- [ ] **Schritt 4: Committen** — `feat: Duplikate innerhalb eines Stapels vor dem Schreiben entfernen`
+- [x] **Schritt 3: Test grün sehen**
+- [x] **Schritt 4: Committen** — `feat: Duplikate innerhalb eines Stapels vor dem Schreiben entfernen`
 
 ---
 
@@ -309,13 +313,13 @@ gestoppter Testcontainer käme mit neuem Port zurück), 300 Nachrichten senden, 
 `chat.dlq` bleibt leer. Den Container fortsetzen: Alle 300 Zeilen kommen an, `chat.dlq`
 ist weiterhin leer.
 
-- [ ] **Schritt 1: Test schreiben, `defaultRequeueRejected = false` und den
+- [x] **Schritt 1: Test schreiben, `defaultRequeueRejected = false` und den
   Verbindungs-Timeout setzen**
-- [ ] **Schritt 2: Test rot sehen** — ohne Wiederholung landen die Nachrichten in
+- [x] **Schritt 2: Test rot sehen** — ohne Wiederholung landen die Nachrichten in
   `chat.dlq`. Genau das verhindert die Schleife.
-- [ ] **Schritt 3: Wiederholung im Listener einbauen**
-- [ ] **Schritt 4: Test grün sehen** — `-Dtest=DatabaseOutageIntegrationTest`
-- [ ] **Schritt 5: Committen** — `feat: bei Datenbankausfall warten und wiederholen statt ablehnen`
+- [x] **Schritt 3: Wiederholung im Listener einbauen**
+- [x] **Schritt 4: Test grün sehen** — `-Dtest=DatabaseOutageIntegrationTest`
+- [x] **Schritt 5: Committen** — `feat: bei Datenbankausfall warten und wiederholen statt ablehnen`
 
 ---
 
@@ -332,9 +336,9 @@ oder DLQ).
 gültige, eine ohne `content`, eine mit kaputtem JSON, wieder eine gültige. Danach stehen
 die zwei gültigen in der Tabelle und die zwei kaputten in `chat.dlq` (Spec 3.2.3).
 
-- [ ] **Schritt 1: Test schreiben**
-- [ ] **Schritt 2: Test grün sehen** — `-Dtest=BrokenMessageIntegrationTest`
-- [ ] **Schritt 3: Committen** — `test: kaputte Nachricht landet einzeln in chat.dlq`
+- [x] **Schritt 1: Test schreiben**
+- [x] **Schritt 2: Test grün sehen** — `-Dtest=BrokenMessageIntegrationTest`
+- [x] **Schritt 3: Committen** — `test: kaputte Nachricht landet einzeln in chat.dlq`
 
 ---
 
@@ -353,10 +357,10 @@ bewiesen ist. Und S2 bis S7 lassen sich nur im Stack prüfen.
 laufen bzw. sind `healthy`, kein Port ist veröffentlicht. Dazu eine Nachricht per
 `POST /messages`, die danach in der Tabelle steht.
 
-- [ ] **Schritt 1: Dockerfile, Compose-Dienste und `.env.example` anlegen**
-- [ ] **Schritt 2: Prüfen** — Befehle von S2, dann eine Nachricht senden und mit `psql`
+- [x] **Schritt 1: Dockerfile, Compose-Dienste und `.env.example` anlegen**
+- [x] **Schritt 2: Prüfen** — Befehle von S2, dann eine Nachricht senden und mit `psql`
   nachsehen.
-- [ ] **Schritt 3: Committen** — `chore: batch-writer und Postgres in docker-compose abbilden`
+- [x] **Schritt 3: Committen** — `chore: batch-writer und Postgres in docker-compose abbilden`
 
 ---
 
@@ -372,25 +376,51 @@ stimmt «vorhanden».
 **Was der Test prüft:** Durchlesen. Jeder Befehl im README ist in Aufgabe 11 oder in der
 Abschluss-Prüfung tatsächlich gelaufen.
 
-- [ ] **Schritt 1: README anpassen**
-- [ ] **Schritt 2: Committen** — `docs: README-Stand für batch-writer und Postgres nachführen`
+- [x] **Schritt 1: README anpassen**
+- [x] **Schritt 2: Committen** — `docs: README-Stand für batch-writer und Postgres nachführen`
+
+---
+
+## Abweichungen vom Plan
+
+- **Aufgabe 9, der Test:** Der erste Entwurf pausierte die Datenbank, bevor der Dienst je
+  geschrieben hatte. Für den allerersten Verbindungsaufbau hat der Postgres-Treiber keine
+  Zeitgrenze; der Versuch hing einfach, bis die Datenbank zurück war. Der Test war deshalb
+  auch **ohne** Wiederholung grün und bewies nichts. Korrigiert: Der Test schreibt zuerst
+  eine Nachricht — wie in S7, wo der Dienst schon läuft. Danach war er ohne Schleife rot
+  (79 Nachrichten in `chat.dlq`) und mit Schleife grün.
+- **Nach Aufgabe 12, zwei Commits aus der Abschluss-Prüfung:**
+  - `refactor: Ergebnisse in den Tests vor dem Vergleich benennen` — die Durchsicht für
+    S8 fand Abfragen direkt in `assertEquals(...)`. CLAUDE.md verlangt auch in Tests ein
+    Ergebnis pro Zeile.
+  - `docs: send-Befehl der Abnahme nummeriert jede Nachricht` — im Messbefehl aus
+    Spec Kap. 5 setzte die Shell die Nummer nie ein. S6 zeigte deshalb `1000|1` statt
+    `1000|1000`, obwohl 1000 verschiedene `id` angekommen waren. Der Fehler lag im
+    Messbefehl, nicht im Dienst.
 
 ---
 
 ## Abschluss-Prüfung
 
 Alle acht Szenarien mit den Befehlen aus Spec Kap. 5, in dieser Reihenfolge, auf einem
-**frischen Klon** mit `.env` aus `.env.example`:
+**frischen Klon** mit `.env` aus `.env.example`. Gemessen am 02.10.2026 auf Commit
+`e648844`; danach kam nur noch dieser Plan-Commit dazu.
 
-- [ ] S1 `mvn -q clean test` — Exit-Code 0
-- [ ] S2 Stack startet, kein Port veröffentlicht
-- [ ] S3 1000 Nachrichten, nach 60 s 1000 neue Zeilen, Queue leer
-- [ ] S4 Rückstau von 1000: höchstens 100 Transaktionen
-- [ ] S5 dieselbe Nachricht zweimal: eine Zeile, `chat.dlq` leer
-- [ ] S6 zwei Instanzen: beide hängen an der Queue, 1000 neue Zeilen, keine doppelt
-- [ ] S7 Postgres 15 s weg: alle 300 kommen an, `chat.dlq` leer, kein Neustart
-- [ ] S8 keine Streams, Kommentar über jeder Klasse und Methode, `.env` nicht im Repo
+- [x] S1 `mvn -q clean test` — Exit-Code 0, 29 Tests (chat-service 14, batch-writer 15),
+  0 Fehler
+- [x] S2 Stack startet, kein Port veröffentlicht — alle vier Dienste laufen, `postgres`
+  und `rabbitmq` sind `healthy`, 0 veröffentlichte Ports, kein `ports:`-Schlüssel
+- [x] S3 1000 Nachrichten — 1000 neue Zeilen, schon direkt nach dem Senden;
+  `chat.persist` leer
+- [x] S4 Rückstau — 1000 Nachrichten warteten ohne Verbraucher, danach 1000 neue Zeilen
+  in **25** Transaktionen (Grenze 100)
+- [x] S5 dieselbe Nachricht zweimal — genau 1 Zeile mit der `id`, `chat.dlq` leer
+- [x] S6 zwei Instanzen — `consumers = 2`, 1000 neue Zeilen, Texte `1000|1000`, beide
+  Instanzen haben Stapel geschrieben
+- [x] S7 Postgres 15 s weg — 300 neue Zeilen, `chat.dlq` leer, `RestartCount` 0 und
+  Startzeit beider Instanzen unverändert, 8 Wiederhol-Zeilen im Log
+- [x] S8 Quelltext — keine Streams, 0 Deklarationen ohne Kommentar in 17 Java-Dateien,
+  `.env` nicht versioniert und über `.gitignore:17` ignoriert
 
-Danach werden die Haken in diesem Plan gesetzt und die gemessenen Werte oben unter
-«Stand» eingetragen, in einem eigenen Commit:
+Die Haken und Werte stehen in einem eigenen Commit:
 `docs: erledigte Aufgaben im Plan des batch-writer abhaken`.
