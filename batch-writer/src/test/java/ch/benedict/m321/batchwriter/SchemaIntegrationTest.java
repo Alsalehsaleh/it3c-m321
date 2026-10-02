@@ -1,8 +1,6 @@
 package ch.benedict.m321.batchwriter;
 
 import org.junit.jupiter.api.Test;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.jdbc.core.JdbcTemplate;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -19,9 +17,6 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * (postgres/init/01-schema.sql). Was hier grün ist, gilt deshalb auch dort.
  */
 class SchemaIntegrationTest extends IntegrationTestBase {
-
-    @Autowired
-    private JdbcTemplate jdbcTemplate;
 
     /** Die sechs Spalten mit Typ, in der Reihenfolge aus PLANUNG.md §3.7, alle NOT NULL. */
     @Test
