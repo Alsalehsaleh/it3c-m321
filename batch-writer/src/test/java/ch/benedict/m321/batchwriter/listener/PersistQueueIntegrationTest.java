@@ -24,7 +24,8 @@ class PersistQueueIntegrationTest extends IntegrationTestBase {
         sendMessages(roomId, 1000);
 
         long rows = waitForRowsInRoom(roomId, 1000);
+        int waitingMessages = messagesWaitingIn(QueueNames.PERSIST_QUEUE);
         assertEquals(1000, rows);
-        assertEquals(0, messagesWaitingIn(QueueNames.PERSIST_QUEUE));
+        assertEquals(0, waitingMessages);
     }
 }

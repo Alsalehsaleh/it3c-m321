@@ -30,8 +30,9 @@ class MessageRepositoryIntegrationTest extends IntegrationTestBase {
 
         int newRows = messageRepository.insertAll(batch);
 
+        long rowsInRoom = countRowsInRoom(roomId);
         assertEquals(500, newRows);
-        assertEquals(500, countRowsInRoom(roomId));
+        assertEquals(500, rowsInRoom);
     }
 
     /** Jedes Feld landet in seiner Spalte, der Zeitpunkt ohne Verschiebung durch Zeitzonen. */
@@ -42,7 +43,8 @@ class MessageRepositoryIntegrationTest extends IntegrationTestBase {
         Instant sentAt = Instant.parse("2026-09-30T16:31:38.474905Z");
         ChatMessage message = new ChatMessage(messageId, roomId, "anna", "Anna Muster", "Hallo Datenbank", sentAt);
 
-        messageRepository.insertAll(List.of(message));
+        List<ChatMessage> batch = List.of(message);
+        messageRepository.insertAll(batch);
 
         Map<String, Object> row = jdbcTemplate.queryForMap(
                 "select room_id, sender_id, sender_name, content from message where id = ?", messageId);
@@ -64,11 +66,13 @@ class MessageRepositoryIntegrationTest extends IntegrationTestBase {
         UUID roomId = UUID.randomUUID();
         ChatMessage original = createMessage(roomId, "Original");
         ChatMessage copy = new ChatMessage(original.id(), roomId, "anna", "Anna Muster", "Kopie", original.sentAt());
+        List<ChatMessage> batch = List.of(original, copy);
 
-        int newRows = messageRepository.insertAll(List.of(original, copy));
+        int newRows = messageRepository.insertAll(batch);
 
+        long rowsInRoom = countRowsInRoom(roomId);
         assertEquals(1, newRows);
-        assertEquals(1, countRowsInRoom(roomId));
+        assertEquals(1, rowsInRoom);
     }
 
     /** Eine id, die schon in der Tabelle steht, wird übergangen; gezählt werden nur neue Zeilen. */
@@ -77,11 +81,14 @@ class MessageRepositoryIntegrationTest extends IntegrationTestBase {
         UUID roomId = UUID.randomUUID();
         ChatMessage first = createMessage(roomId, "erste");
         ChatMessage second = createMessage(roomId, "zweite");
-        messageRepository.insertAll(List.of(first));
+        List<ChatMessage> firstBatch = List.of(first);
+        List<ChatMessage> laterBatch = List.of(first, second);
+        messageRepository.insertAll(firstBatch);
 
-        int newRows = messageRepository.insertAll(List.of(first, second));
+        int newRows = messageRepository.insertAll(laterBatch);
 
+        long rowsInRoom = countRowsInRoom(roomId);
         assertEquals(1, newRows);
-        assertEquals(2, countRowsInRoom(roomId));
+        assertEquals(2, rowsInRoom);
     }
 }

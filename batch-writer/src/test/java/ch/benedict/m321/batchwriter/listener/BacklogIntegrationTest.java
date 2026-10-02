@@ -45,7 +45,8 @@ class BacklogIntegrationTest extends IntegrationTestBase {
         try {
             sendMessages(roomId, 1000);
             Thread.sleep(STATISTICS_DELAY_MILLIS);
-            assertEquals(1000, messagesWaitingIn(QueueNames.PERSIST_QUEUE));
+            int waitingMessages = messagesWaitingIn(QueueNames.PERSIST_QUEUE);
+            assertEquals(1000, waitingMessages);
             long transactionsBefore = committedTransactions();
 
             listenerRegistry.start();

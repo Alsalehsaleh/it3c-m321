@@ -40,8 +40,9 @@ class DuplicateMessageIntegrationTest extends IntegrationTestBase {
         long rowsInRoom = waitForRowsInRoom(roomId, 2);
         Long rowsWithId = jdbcTemplate.queryForObject(
                 "select count(*) from message where id = ?", Long.class, messageId);
+        int deadLetters = messagesWaitingIn(QueueNames.DEAD_LETTER_QUEUE);
         assertEquals(2, rowsInRoom);
         assertEquals(1, rowsWithId);
-        assertEquals(0, messagesWaitingIn(QueueNames.DEAD_LETTER_QUEUE));
+        assertEquals(0, deadLetters);
     }
 }

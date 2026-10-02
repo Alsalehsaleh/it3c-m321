@@ -50,14 +50,16 @@ class DatabaseOutageIntegrationTest extends IntegrationTestBase {
         try {
             sendMessages(roomId, 300);
             Thread.sleep(OUTAGE_MILLIS);
-            assertEquals(0, messagesWaitingIn(QueueNames.DEAD_LETTER_QUEUE));
+            int deadLettersDuringOutage = messagesWaitingIn(QueueNames.DEAD_LETTER_QUEUE);
+            assertEquals(0, deadLettersDuringOutage);
         } finally {
             resumeDatabase();
         }
 
         long rows = waitForRowsInRoom(roomId, 301);
+        int deadLettersAfterOutage = messagesWaitingIn(QueueNames.DEAD_LETTER_QUEUE);
         assertEquals(301, rows);
-        assertEquals(0, messagesWaitingIn(QueueNames.DEAD_LETTER_QUEUE));
+        assertEquals(0, deadLettersAfterOutage);
     }
 
     /** Hält alle Prozesse im Postgres-Container an. Verbindungen bleiben ohne Antwort. */
