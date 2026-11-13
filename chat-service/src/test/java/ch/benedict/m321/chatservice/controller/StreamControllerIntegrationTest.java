@@ -35,9 +35,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * offen, und mit "graceful" würde Spring bis zu 30 s auf sie warten. Im
  * Betrieb bleibt "graceful" (Spec 3.2.2).
  */
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.shutdown=immediate")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.shutdown=immediate")
 @Testcontainers
 class StreamControllerIntegrationTest {
 

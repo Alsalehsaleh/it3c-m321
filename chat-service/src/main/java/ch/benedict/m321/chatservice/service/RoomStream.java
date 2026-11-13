@@ -56,7 +56,7 @@ public class RoomStream {
      *
      * Weil publish dasselbe Schloss hat, liegt jede Nachricht entweder schon
      * im Puffer und wird hier nachgeholt, oder sie kommt erst danach und geht
-     * live an den eingetragenen Stream. Beides oder keins ist unmöglich
+     * live an den eingetragenen Stream; beides oder keins ist unmöglich
      * (Spec 3.2.5). Andersherum, erst eintragen und dann nachholen, könnte
      * eine Live-Nachricht vor den nachgeholten ankommen.
      */

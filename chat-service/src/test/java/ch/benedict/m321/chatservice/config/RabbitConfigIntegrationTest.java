@@ -33,6 +33,9 @@ class RabbitConfigIntegrationTest {
     @Autowired
     private RabbitAdmin rabbitAdmin;
 
+    /**
+     * Der Schreibweg braucht chat.persist, sonst gingen Nachrichten verloren.
+     */
     @Test
     void declaresPersistQueue() {
         Properties properties = rabbitAdmin.getQueueProperties(QueueNames.PERSIST_QUEUE);
@@ -40,6 +43,9 @@ class RabbitConfigIntegrationTest {
         assertNotNull(properties);
     }
 
+    /**
+     * chat.dlq muss existieren, bevor der batch-writer etwas dorthin ablehnt.
+     */
     @Test
     void declaresDeadLetterQueue() {
         Properties properties = rabbitAdmin.getQueueProperties(QueueNames.DEAD_LETTER_QUEUE);

@@ -39,7 +39,7 @@ class RoomStreamTest {
         assertEquals(expectedEvent, secondEvents.get(0));
     }
 
-    /** Nach dem Abmelden geht nichts mehr an diesen Stream. */
+    /** Nach dem Abmelden bekommt dieser Stream nichts mehr. */
     @Test
     void unsubscribedStreamReceivesNothing() {
         RoomStream roomStream = new RoomStream();

@@ -757,7 +757,20 @@ Nicht committen, bis ich es geprüft habe. Commit-Message nur bei Funden:
 - [ ] **Schritt 3: Tests grün sehen** — `mvn -q clean test`
 - [ ] **Schritt 4: Committen** — nur bei Funden: `refactor: Durchsicht der Live-Zustellung nach CLAUDE.md`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Durchsicht durch den Council (KI-Review) mit den drei Befehlen
+aus Spec Kap. 5 S8. Funde:
+1. S8.1 meldete jede Zeile mit `roomStream.` als Treffer, weil der Befehl `Stream\.` suchte.
+   Es gibt keine Java-Streams. Der Befehl in der Spec sucht jetzt `\bStream\.`, in einem
+   eigenen Commit (`docs: S8-Prüfbefehl sucht Stream nur als ganzes Wort`). Danach blieben zwei
+   deutsche Kommentarsätze, die auf «…Stream.» endeten; sie sind umgestellt.
+2. S8.2 fand 19 Methoden ohne Kommentar. 17 davon stammen aus Bewertung 1 (`main`,
+   `handleBrokerNotAvailable` und Testmethoden der alten Tests), weil S8 dort nur den
+   `batch-writer` geprüft hatte. Jetzt hat jede einen Kommentar, der das Warum nennt. Die
+   zwei anderen waren `@SpringBootTest(...)` über mehrere Zeilen in zwei neuen Tests; das
+   verwirrte den Prüfbefehl. Die Annotation steht jetzt auf einer Zeile.
+3. S8.3 ohne Fund: `.env` nicht versioniert, in `.gitignore`, im Code nur Platzhalter.
+Ausserdem ein veralteter Kommentar im `MessagePublisherIntegrationTest` («Wir spielen ein
+web-gateway»). Danach alle drei Befehle ohne Ausgabe, `mvn -q clean test` EXIT 0, 55 Tests.
 
 ---
 

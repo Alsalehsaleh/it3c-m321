@@ -57,6 +57,9 @@ class MessagePublisherIntegrationTest {
         rabbitAdmin.purgeQueue(QueueNames.PERSIST_QUEUE);
     }
 
+    /**
+     * Die Nachricht landet im Schreibweg chat.persist.
+     */
     @Test
     void publishesToPersistQueue() {
         ChatMessage message = createMessage("Hallo Schreibweg");
@@ -69,9 +72,13 @@ class MessagePublisherIntegrationTest {
         assertEquals("Hallo Schreibweg", persisted.content());
     }
 
+    /**
+     * Die Nachricht geht auch an den Fanout-Exchange chat.delivery: Jede gebundene
+     * Queue bekommt eine Kopie.
+     */
     @Test
     void publishesToDeliveryExchange() {
-        // Wir spielen ein web-gateway: eigene Queue an den Fanout binden.
+        // Wir spielen eine Zustell-Queue: eigene Queue an den Fanout binden.
         Queue gatewayQueue = new AnonymousQueue();
         rabbitAdmin.declareQueue(gatewayQueue);
 

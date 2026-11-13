@@ -48,9 +48,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
  * server.shutdown=immediate nur im Test, damit Spring am Ende nicht 30 s auf
  * die offenen Streams wartet. Im Betrieb bleibt "graceful" (Spec 3.2.2).
  */
-@SpringBootTest(
-        webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
-        properties = "server.shutdown=immediate")
+@SpringBootTest(webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT, properties = "server.shutdown=immediate")
 @Testcontainers
 @ExtendWith(OutputCaptureExtension.class)
 class DeliveryListenerIntegrationTest {

@@ -40,6 +40,9 @@ class MessageControllerIntegrationTest {
     @Autowired
     private RabbitTemplate rabbitTemplate;
 
+    /**
+     * Der ganze Weg einmal durch: POST mit 202, danach liegt die Nachricht in chat.persist.
+     */
     @Test
     void acceptsMessageAndPutsItOnTheQueue() throws Exception {
         String requestBody = """
@@ -68,6 +71,9 @@ class MessageControllerIntegrationTest {
         assertEquals("Anna Muster", message.senderName());
     }
 
+    /**
+     * Eine Nachricht nur aus Leerzeichen wird mit 400 abgelehnt.
+     */
     @Test
     void rejectsEmptyContent() throws Exception {
         String requestBody = """

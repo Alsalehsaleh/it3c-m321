@@ -22,12 +22,18 @@ class SendMessageRequestTest {
 
     private Validator validator;
 
+    /**
+     * Ein echter Validator, wie ihn Spring beim POST benutzt.
+     */
     @BeforeEach
     void setUp() {
         ValidatorFactory factory = Validation.buildDefaultValidatorFactory();
         this.validator = factory.getValidator();
     }
 
+    /**
+     * Eine vollständige Anfrage hat keine Verletzung.
+     */
     @Test
     void acceptsCompleteRequest() {
         SendMessageRequest request = new SendMessageRequest(
@@ -38,6 +44,9 @@ class SendMessageRequestTest {
         assertTrue(violations.isEmpty());
     }
 
+    /**
+     * Leerer Inhalt ist genau eine Verletzung.
+     */
     @Test
     void rejectsBlankContent() {
         SendMessageRequest request = new SendMessageRequest(
@@ -48,6 +57,9 @@ class SendMessageRequestTest {
         assertEquals(1, violations.size());
     }
 
+    /**
+     * Ohne roomId weiss niemand, in welchen Raum die Nachricht gehört.
+     */
     @Test
     void rejectsMissingRoomId() {
         SendMessageRequest request = new SendMessageRequest(

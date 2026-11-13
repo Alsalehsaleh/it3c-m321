@@ -13,6 +13,9 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
  */
 class MessageExceptionHandlerTest {
 
+    /**
+     * Ein Broker-Fehler wird zu 503 mit einem verständlichen Text.
+     */
     @Test
     void answersWithServiceUnavailable() {
         MessageExceptionHandler handler = new MessageExceptionHandler();

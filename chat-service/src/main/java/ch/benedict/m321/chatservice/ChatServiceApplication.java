@@ -13,6 +13,10 @@ import org.springframework.boot.autoconfigure.SpringBootApplication;
 @SpringBootApplication
 public class ChatServiceApplication {
 
+    /**
+     * Startet die Anwendung. Spring Boot baut daraus den ganzen Kontext mit
+     * Webserver und RabbitMQ-Verbindung.
+     */
     public static void main(String[] args) {
         SpringApplication.run(ChatServiceApplication.class, args);
     }
