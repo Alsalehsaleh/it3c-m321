@@ -493,7 +493,16 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 3: Gegenprobe rot sehen** — mit festem Queue-Namen, danach zurückstellen
 - [ ] **Schritt 4: Committen** — `test: zwei Instanzen stellen jedem Raum alle Nachrichten zu`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Grün: 1 Test, 0 Fehler, zwei Instanzen mit den Queues
+`chat.delivery.local.35faa16e-…` und `chat.delivery.local.c747e008-…`. Gegenprobe mit festem
+Queue-Namen ohne UUID: rot («expected: not equal but was: chat.delivery.local»), danach
+zurückgestellt. Geprüft hat der Council (KI-Review) gegen Spec 3.2.1 und 4: beide A-Streams
+40 Ereignisse, 40 verschiedene ids, pro Absender in Reihenfolge; B-Stream 0. Korrigiert:
+Der erste Lauf startete beide Instanzen auf Port 8080 gegen `localhost:5672`, weil
+`SpringApplicationBuilder.properties(...)` nur Vorgabewerte setzt, die `application.yml`
+überschreibt. Die Werte gehen jetzt als Kommandozeilen-Argumente hinein. Jeder Test startet
+eigene Instanzen (`@BeforeEach`/`@AfterEach`), damit Aufgabe 8 eine schliessen kann, ohne
+andere Tests zu stören.
 
 ---
 
