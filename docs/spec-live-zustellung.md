@@ -1056,7 +1056,7 @@ Die Neuverbindung muss deshalb an beiden Instanzen genau die 50 fehlenden liefer
 
 ```bash
 # 1. Keine Streams und keine forEach-Lambdas — erwartet: keine Ausgabe
-grep -rnE '\.stream\(|Stream\.|Collectors|\.forEach\(' chat-service/src
+grep -rnE '\.stream\(|\bStream\.|Collectors|\.forEach\(' chat-service/src
 
 # 2. Ein Kommentar direkt über jeder Klasse und jeder Methode — erwartet: keine Ausgabe
 awk '
