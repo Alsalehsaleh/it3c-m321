@@ -1,5 +1,6 @@
 package ch.benedict.m321.chatservice;
 
+import ch.benedict.m321.chatservice.config.QueueNames;
 import ch.benedict.m321.chatservice.service.RoomStream;
 import ch.benedict.m321.chatservice.service.RoomStreamRegistry;
 import ch.benedict.m321.chatservice.support.StreamReader;
@@ -29,8 +30,10 @@ import java.util.Set;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 /**
@@ -111,6 +114,72 @@ class TwoInstancesIntegrationTest {
         roomAOnFirst.close();
         roomAOnSecond.close();
         roomBOnFirst.close();
+    }
+
+    /**
+     * S7 im Kleinen: Ein Client an Instanz 1 bekommt eine Nachricht und trennt.
+     * Dann kommen 50 Nachrichten. Mit Last-Event-ID neu verbunden, an derselben
+     * UND an der anderen Instanz, bekommt er genau die 50, in Reihenfolge,
+     * keine doppelt, und danach geht es live weiter (Spec 3.2.5).
+     */
+    @Test
+    void reconnectWithLastEventIdDeliversExactlyTheMissedMessagesOnBothInstances() throws Exception {
+        UUID roomId = UUID.randomUUID();
+        StreamReader firstConnection = openStream(firstInstance, roomId);
+        String seenId = postMessage(firstInstance, roomId, "anna", "vor dem Trennen");
+        assertTrue(firstConnection.waitForLine("id:" + seenId, TIMEOUT));
+        firstConnection.close();
+
+        List<String> missedIds = new ArrayList<>();
+        for (int i = 1; i <= 50; i++) {
+            String missedId = postMessage(firstInstance, roomId, "anna", "verpasst " + i);
+            missedIds.add(missedId);
+        }
+        String lastMissed = missedIds.get(49);
+        StreamReader sameInstance = new StreamReader(baseUrl(firstInstance) + "/stream?roomId=" + roomId, seenId);
+        StreamReader otherInstance = new StreamReader(baseUrl(secondInstance) + "/stream?roomId=" + roomId, seenId);
+        assertTrue(sameInstance.waitForLine("id:" + lastMissed, TIMEOUT));
+        assertTrue(otherInstance.waitForLine("id:" + lastMissed, TIMEOUT));
+
+        String liveId = postMessage(secondInstance, roomId, "anna", "wieder live");
+        assertTrue(sameInstance.waitForLine("id:" + liveId, TIMEOUT));
+        assertTrue(otherInstance.waitForLine("id:" + liveId, TIMEOUT));
+
+        List<String> expectedIds = new ArrayList<>(missedIds);
+        expectedIds.add(liveId);
+        List<String> idsOnSameInstance = idsInStream(sameInstance);
+        List<String> idsOnOtherInstance = idsInStream(otherInstance);
+        sameInstance.close();
+        otherInstance.close();
+        assertEquals(expectedIds, idsOnSameInstance);
+        assertEquals(expectedIds, idsOnOtherInstance);
+        assertFalse(idsOnSameInstance.contains(seenId));
+    }
+
+    /**
+     * S4 im Kleinen: Wird Instanz 2 geschlossen, verschwindet ihre Zustell-Queue
+     * sofort, weil auto-delete greift, sobald ihr Consumer weg ist. Die 5 s sind
+     * strenger als die 30 s aus S4 und kürzer als x-expires (10 s): So zeigt der
+     * Test, dass wirklich auto-delete aufräumt und nicht erst das Sicherheitsnetz
+     * (Spec 3.2.2). Die Queue von Instanz 1, chat.persist und chat.dlq bleiben.
+     */
+    @Test
+    void closedInstanceLosesItsDeliveryQueueOthersStay() throws Exception {
+        String firstQueue = deliveryQueueName(firstInstance);
+        String secondQueue = deliveryQueueName(secondInstance);
+        RabbitAdmin rabbitAdmin = firstInstance.getBean(RabbitAdmin.class);
+        assertNotNull(rabbitAdmin.getQueueProperties(secondQueue));
+
+        secondInstance.close();
+
+        Instant deadline = Instant.now().plus(Duration.ofSeconds(5));
+        while (rabbitAdmin.getQueueProperties(secondQueue) != null && Instant.now().isBefore(deadline)) {
+            Thread.sleep(100);
+        }
+        assertNull(rabbitAdmin.getQueueProperties(secondQueue), "Queue von Instanz 2 besteht noch");
+        assertNotNull(rabbitAdmin.getQueueProperties(firstQueue));
+        assertNotNull(rabbitAdmin.getQueueProperties(QueueNames.PERSIST_QUEUE));
+        assertNotNull(rabbitAdmin.getQueueProperties(QueueNames.DEAD_LETTER_QUEUE));
     }
 
     /**

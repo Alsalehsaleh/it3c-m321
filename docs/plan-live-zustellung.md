@@ -556,7 +556,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 3: Gegenproben rot sehen** — danach zurückstellen
 - [ ] **Schritt 4: Committen** — `test: Neuverbindung und Aufräumen über zwei Instanzen`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Grün: 3 Tests in `TwoInstancesIntegrationTest`, 0 Fehler. Beide
+Gegenproben rot und danach zurückgestellt: `subscribe` ohne Nachholen → die verpassten
+Nachrichten kommen nie an; ohne `autoDelete` → die Queue von Instanz 2 besteht nach 5 s noch
+(0 Consumer). Geprüft hat der Council (KI-Review) gegen Spec 2.3, 3.2.2 und 3.2.5: An beiden
+Instanzen genau die 50 verpassten ids in Reihenfolge, danach die neue live, die schon
+gesehene nicht. Korrigiert am Auftrag: Der Plan nannte für S4 eine Zeitgrenze von 15 s. Der
+Test nimmt 5 s, kürzer als `x-expires` (10 s). Mit 15 s wäre die Gegenprobe ohne
+`autoDelete` grün geblieben, weil dann `x-expires` aufgeräumt hätte, und der Test hätte
+nicht gezeigt, welcher Mechanismus wirkt.
 
 ---
 
