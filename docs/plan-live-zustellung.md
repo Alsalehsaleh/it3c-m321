@@ -611,7 +611,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Tests grün sehen** — `-Dtest=RoomStreamTest,HeartbeatSenderTest`
 - [ ] **Schritt 5: Committen** — `feat: Lebenszeichen alle 15 s an alle offenen Streams`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (`sendHeartbeat` und `HeartbeatSender` fehlten),
+danach grün: `RoomStreamTest` 9, `HeartbeatSenderTest` 1, `RoomStreamRegistryTest` 2, 0
+Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.2 und 3.2.5: Auf der Leitung steht
+genau `:ping` und eine Leerzeile; das Lebenszeichen landet nicht im Puffer; ein Stream, an
+dem es scheitert, wird ausgetragen; `sendHeartbeat` ist `synchronized` und sendet über eine
+Kopie der Liste. Korrigiert: `trySend` nimmt jetzt ein fertiges Ereignis statt einer
+Nachricht, damit Nachricht und Lebenszeichen denselben Fehlerweg nehmen; das Ereignis einer
+Nachricht baut die neue Methode `messageEvent`. Der `HeartbeatSender` holt die Räume als
+Kopie und hält das Schloss der Registry nicht, während er sendet.
 
 ---
 

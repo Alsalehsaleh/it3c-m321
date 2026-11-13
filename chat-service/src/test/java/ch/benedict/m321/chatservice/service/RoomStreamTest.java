@@ -161,6 +161,45 @@ class RoomStreamTest {
         assertEquals(expected, numbers);
     }
 
+    /**
+     * Das Lebenszeichen geht als Kommentarzeile ":ping" an jeden Stream des Raums
+     * und landet nicht im Puffer (Spec 2.2).
+     */
+    @Test
+    void heartbeatSendsCommentToEveryStream() {
+        RoomStream roomStream = new RoomStream();
+        RecordingEmitter first = new RecordingEmitter();
+        RecordingEmitter second = new RecordingEmitter();
+        roomStream.subscribe(first, null);
+        roomStream.subscribe(second, null);
+
+        roomStream.sendHeartbeat();
+
+        List<String> firstEvents = first.sentEvents();
+        List<String> secondEvents = second.sentEvents();
+        List<BufferedMessage> buffer = roomStream.copyOfBuffer();
+        assertEquals(List.of(":ping\n\n"), firstEvents);
+        assertEquals(List.of(":ping\n\n"), secondEvents);
+        assertTrue(buffer.isEmpty());
+    }
+
+    /**
+     * Scheitert das Lebenszeichen, ist der Stream tot und wird ausgetragen.
+     * Genau dafür gibt es das Lebenszeichen in ruhigen Räumen (Spec 2.2).
+     */
+    @Test
+    void heartbeatRemovesBrokenStream() {
+        RoomStream roomStream = new RoomStream();
+        RecordingEmitter broken = new RecordingEmitter();
+        roomStream.subscribe(broken, null);
+        broken.setFailing(true);
+
+        roomStream.sendHeartbeat();
+
+        int openStreams = roomStream.openStreamCount();
+        assertEquals(0, openStreams);
+    }
+
     /** Wartet auf das Startsignal und publiziert dann die Nachrichten 101 bis 200. */
     private void publishAfterSignal(RoomStream roomStream, CountDownLatch startSignal) {
         try {

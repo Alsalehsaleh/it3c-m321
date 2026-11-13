@@ -24,6 +24,9 @@ public class RoomStream {
     /** So viele Nachrichten hält der Puffer pro Raum. Begründung: Spec 3.2.5. */
     static final int BUFFER_SIZE = 200;
 
+    /** Inhalt der Kommentarzeile, die als Lebenszeichen geschickt wird: ":ping". */
+    private static final String HEARTBEAT_COMMENT = "ping";
+
     private final Deque<BufferedMessage> buffer = new ArrayDeque<>();
 
     private final List<SseEmitter> emitters = new ArrayList<>();
@@ -39,7 +42,8 @@ public class RoomStream {
         addToBuffer(message);
         List<SseEmitter> receivers = new ArrayList<>(emitters);
         for (SseEmitter emitter : receivers) {
-            boolean sent = trySend(emitter, message);
+            SseEmitter.SseEventBuilder event = messageEvent(message);
+            boolean sent = trySend(emitter, event);
             if (!sent) {
                 emitters.remove(emitter);
             }
@@ -59,7 +63,8 @@ public class RoomStream {
     public synchronized void subscribe(SseEmitter emitter, String lastEventId) {
         List<BufferedMessage> missedMessages = messagesAfter(lastEventId);
         for (BufferedMessage message : missedMessages) {
-            boolean sent = trySend(emitter, message);
+            SseEmitter.SseEventBuilder event = messageEvent(message);
+            boolean sent = trySend(emitter, event);
             if (!sent) {
                 return;
             }
@@ -73,6 +78,25 @@ public class RoomStream {
      */
     public synchronized void unsubscribe(SseEmitter emitter) {
         emitters.remove(emitter);
+    }
+
+    /**
+     * Schickt jedem Stream die Kommentarzeile ":ping". Clients ignorieren sie,
+     * aber der Dienst muss dafür schreiben und merkt so, welche Streams tot
+     * sind. Ohne Lebenszeichen blieben sie in ruhigen Räumen für immer in der
+     * Liste (Spec 2.2). Geht durch dasselbe Schloss und über eine Kopie der
+     * Liste, aus denselben Gründen wie publish (Spec 3.2.5).
+     */
+    public synchronized void sendHeartbeat() {
+        List<SseEmitter> receivers = new ArrayList<>(emitters);
+        for (SseEmitter emitter : receivers) {
+            SseEmitter.SseEventBuilder heartbeat = SseEmitter.event();
+            heartbeat.comment(HEARTBEAT_COMMENT);
+            boolean sent = trySend(emitter, heartbeat);
+            if (!sent) {
+                emitters.remove(emitter);
+            }
+        }
     }
 
     /**
@@ -128,9 +152,17 @@ public class RoomStream {
         return missedMessages;
     }
 
+    /** Ein Ereignis für eine Nachricht: id ist die id der Nachricht, data der unveränderte Body. */
+    private SseEmitter.SseEventBuilder messageEvent(BufferedMessage message) {
+        String eventId = message.id().toString();
+        SseEmitter.SseEventBuilder event = SseEmitter.event();
+        event.id(eventId);
+        event.data(message.body());
+        return event;
+    }
+
     /**
-     * Schickt eine Nachricht an einen Stream: id ist die id der Nachricht,
-     * data der unveränderte Body. Gibt zurück, ob es geklappt hat.
+     * Schickt ein Ereignis an einen Stream und gibt zurück, ob es geklappt hat.
      *
      * Ein Fehler betrifft nur diesen einen Stream, und keine Exception
      * verlässt die Methode. Sonst würde der Listener die Nachricht zurück in
@@ -138,11 +170,7 @@ public class RoomStream {
      * Austragen muss der Aufrufer, denn nur er weiss, ob der Stream schon in
      * der Liste steht.
      */
-    private boolean trySend(SseEmitter emitter, BufferedMessage message) {
-        String eventId = message.id().toString();
-        SseEmitter.SseEventBuilder event = SseEmitter.event();
-        event.id(eventId);
-        event.data(message.body());
+    private boolean trySend(SseEmitter emitter, SseEmitter.SseEventBuilder event) {
         try {
             emitter.send(event);
             return true;

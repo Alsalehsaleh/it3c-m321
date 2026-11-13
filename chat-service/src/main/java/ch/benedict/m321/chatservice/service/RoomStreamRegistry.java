@@ -2,7 +2,9 @@ package ch.benedict.m321.chatservice.service;
 
 import org.springframework.stereotype.Component;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
@@ -34,5 +36,13 @@ public class RoomStreamRegistry {
             roomStreams.put(roomId, roomStream);
         }
         return roomStream;
+    }
+
+    /**
+     * Alle Räume dieser Instanz als Kopie. Der HeartbeatSender läuft darüber,
+     * ohne das Schloss der Registry zu halten, während er sendet.
+     */
+    public synchronized List<RoomStream> copyOfAllRoomStreams() {
+        return new ArrayList<>(roomStreams.values());
     }
 }
