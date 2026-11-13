@@ -152,7 +152,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 5: Committen** — `feat: RoomStream hält Puffer und Streams eines Raums`
 
 **Geprüft und korrigiert:** Rot gesehen (Kompilierfehler, `BufferedMessage` fehlt), danach
-grün: 4 Tests, 0 Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.2, 3.2.5, 3.2.6
+grün: 4 Tests, 0 Fehler. Geprüft habe ich und der Council (KI-Review) gegen Spec 2.2, 3.2.5, 3.2.6
 und CLAUDE.md: Ereignis genau `id:<id>`, `data:<body>`, Leerzeile, ohne Leerzeichen; Puffer
 wirft bei 201 die älteste raus; gesendet wird über eine Kopie der Liste, weil das Austragen
 im selben Thread sonst eine `ConcurrentModificationException` gäbe; `IOException` und
@@ -205,7 +205,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 5: Committen** — `feat: verpasste Nachrichten nach Last-Event-ID nachholen`
 
 **Geprüft und korrigiert:** Rot gesehen (`subscribe` mit zwei Parametern fehlte), danach
-grün: 7 Tests, 0 Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.3 und 3.2.5:
+grün: 7 Tests, 0 Fehler. Geprüft habe ich und  der Council (KI-Review) gegen Spec 2.3 und 3.2.5:
 `subscribe` holt im selben Schloss wie `publish` zuerst nach und trägt erst dann ein; der
 Nahtstellen-Test mit zweitem Thread bekommt 11 bis 200 genau einmal und in Reihenfolge;
 `null`, leer, keine UUID und unbekannte ID ergeben nur eine Log-Zeile und keinen Fehler.
@@ -253,7 +253,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 5: Committen** — `feat: RoomStreamRegistry hält einen RoomStream pro Raum`
 
 **Geprüft und korrigiert:** Rot gesehen (`RoomStreamRegistry` fehlte), danach grün: 2 Tests,
-0 Fehler. Geprüft hat der Council (KI-Review): `getOrCreate` ist `synchronized`, der Test
+0 Fehler. Geprüft  habe ich und der Council (KI-Review): `getOrCreate` ist `synchronized`, der Test
 mit zwei gleichzeitigen Threads läuft 200 Mal und bekommt jedes Mal dasselbe Objekt.
 Bewusst `HashMap` mit `synchronized` statt `ConcurrentHashMap.computeIfAbsent` mit Lambda,
 weil es sich laut vorlesen lässt (CLAUDE.md). Das Schloss der Registry hält nur das
@@ -307,7 +307,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 5: Committen** — `feat: Endpunkt GET /stream öffnet einen SSE-Stream pro Raum`
 
 **Geprüft und korrigiert:** Rot gesehen (4 Fehler, überall `404`), danach grün: 4 Tests,
-0 Fehler. Geprüft hat der Council (KI-Review). Drei Korrekturen, alle im Test:
+0 Fehler. Geprüft  habe ich und der Council (KI-Review). Drei Korrekturen, alle im Test:
 1. Der erste grüne Lauf hing. Ursache: Spring schickt die Kopfzeilen eines `SseEmitter` erst
    mit dem ersten Ereignis, der `StreamReader` wartete beim Öffnen aber darauf. Jetzt öffnet
    er asynchron, und der Test publiziert zuerst eine Nachricht. Der Controller blieb gleich.
@@ -371,7 +371,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 5: Committen** — `feat: eigene Zustell-Queue pro Instanz an chat.delivery binden`
 
 **Geprüft und korrigiert:** Rot gesehen (3 Fehler, kein Bean `deliveryQueue`), danach grün:
-3 Tests, 0 Fehler; alle 11 Testklassen des `chat-service` bleiben grün. Geprüft hat der
+3 Tests, 0 Fehler; alle 11 Testklassen des `chat-service` bleiben grün. Geprüft  habe ich und der
 Council (KI-Review) gegen Spec 3.2.2, 3.2.4 und 4: Die Management-API des Brokers zeigt
 `durable = false`, `auto_delete = true`, `x-expires = 10000`, `x-max-length = 900`,
 `x-overflow = drop-head`, keine Dead-Letter-Route; Name `chat.delivery.<Hostname>.<UUID>`,
@@ -435,7 +435,7 @@ Co-Authored-By-Zeile.
 
 **Geprüft und korrigiert:** Rot gesehen (3 Fehler, der Stream bekam kein Ereignis), danach
 grün: 3 Tests, 0 Fehler; alle 12 Testklassen des `chat-service` grün (33 Tests). Geprüft
-hat der Council (KI-Review) gegen Spec 2.1, 3.1, 3.2.1 und 4.1: `data:` ist Zeichen für
+ habe ich und der Council (KI-Review) gegen Spec 2.1, 3.1, 3.2.1 und 4.1: `data:` ist Zeichen für
 Zeichen der Body aus `chat.persist` (der Test holt ihn dort ab und vergleicht); Raum B
 bekommt nichts; 50 Nachrichten kommen in Reihenfolge. Der Listener liest mit
 `concurrency 1`, `prefetch 50`, `default-requeue-rejected false`, jeweils mit Kommentar
@@ -496,7 +496,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 **Geprüft und korrigiert:** Grün: 1 Test, 0 Fehler, zwei Instanzen mit den Queues
 `chat.delivery.local.35faa16e-…` und `chat.delivery.local.c747e008-…`. Gegenprobe mit festem
 Queue-Namen ohne UUID: rot («expected: not equal but was: chat.delivery.local»), danach
-zurückgestellt. Geprüft hat der Council (KI-Review) gegen Spec 3.2.1 und 4: beide A-Streams
+zurückgestellt. Geprüft  habe ich und der Council (KI-Review) gegen Spec 3.2.1 und 4: beide A-Streams
 40 Ereignisse, 40 verschiedene ids, pro Absender in Reihenfolge; B-Stream 0. Korrigiert:
 Der erste Lauf startete beide Instanzen auf Port 8080 gegen `localhost:5672`, weil
 `SpringApplicationBuilder.properties(...)` nur Vorgabewerte setzt, die `application.yml`
@@ -559,7 +559,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 **Geprüft und korrigiert:** Grün: 3 Tests in `TwoInstancesIntegrationTest`, 0 Fehler. Beide
 Gegenproben rot und danach zurückgestellt: `subscribe` ohne Nachholen → die verpassten
 Nachrichten kommen nie an; ohne `autoDelete` → die Queue von Instanz 2 besteht nach 5 s noch
-(0 Consumer). Geprüft hat der Council (KI-Review) gegen Spec 2.3, 3.2.2 und 3.2.5: An beiden
+(0 Consumer). Geprüft  habe ich und der Council (KI-Review) gegen Spec 2.3, 3.2.2 und 3.2.5: An beiden
 Instanzen genau die 50 verpassten ids in Reihenfolge, danach die neue live, die schon
 gesehene nicht. Korrigiert am Auftrag: Der Plan nannte für S4 eine Zeitgrenze von 15 s. Der
 Test nimmt 5 s, kürzer als `x-expires` (10 s). Mit 15 s wäre die Gegenprobe ohne
@@ -613,7 +613,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 
 **Geprüft und korrigiert:** Rot gesehen (`sendHeartbeat` und `HeartbeatSender` fehlten),
 danach grün: `RoomStreamTest` 9, `HeartbeatSenderTest` 1, `RoomStreamRegistryTest` 2, 0
-Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.2 und 3.2.5: Auf der Leitung steht
+Fehler. Geprüft  habe ich und der Council (KI-Review) gegen Spec 2.2 und 3.2.5: Auf der Leitung steht
 genau `:ping` und eine Leerzeile; das Lebenszeichen landet nicht im Puffer; ein Stream, an
 dem es scheitert, wird ausgetragen; `sendHeartbeat` ist `synchronized` und sendet über eine
 Kopie der Liste. Korrigiert: `trySend` nimmt jetzt ein fertiges Ereignis statt einer
@@ -671,7 +671,7 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 
 **Geprüft und korrigiert:** Rot gesehen («Warnung fehlt im Log»; im Log stand eine
 `NullPointerException` für die Nachricht ohne `id`), danach grün: 4 Tests, 0 Fehler. Geprüft
-hat der Council (KI-Review) gegen Spec 3.2.6: Kaputtes JSON lehnt Spring beim Umwandeln ab
+ habe ich und der Council (KI-Review) gegen Spec 3.2.6: Kaputtes JSON lehnt Spring beim Umwandeln ab
 (`MessageConversionException`), JSON ohne `roomId` und ohne `id` ergibt je eine Warnung
 «Ignoring message without id or roomId»; keine wird zugestellt, die Zustell-Queue ist danach
 leer, und eine gültige Nachricht kommt normal an. Korrigiert am Plan: Der Test sendet
@@ -722,7 +722,7 @@ Angepasst sind die zwei veralteten in `QueueNames` und `RabbitConfig`. Stehen ge
 weil sie vom späteren Gateway sprechen und stimmen: `MessageController` (das Gateway ruft
 `POST /messages` später auf), `ChatMessage` (das Gateway bekommt später eine eigene Kopie
 des Vertrags) und der Kommentar im bestehenden `MessagePublisherIntegrationTest`. README:
-Zeile `chat-service` um `GET /stream` ergänzt. Geprüft hat der Council (KI-Review).
+Zeile `chat-service` um `GET /stream` ergänzt. Geprüft  habe ich und der Council (KI-Review).
 
 ---
 
@@ -757,7 +757,7 @@ Nicht committen, bis ich es geprüft habe. Commit-Message nur bei Funden:
 - [ ] **Schritt 3: Tests grün sehen** — `mvn -q clean test`
 - [ ] **Schritt 4: Committen** — nur bei Funden: `refactor: Durchsicht der Live-Zustellung nach CLAUDE.md`
 
-**Geprüft und korrigiert:** Durchsicht durch den Council (KI-Review) mit den drei Befehlen
+**Geprüft und korrigiert:** Durchsicht durch mich und den Council (KI-Review) mit den drei Befehlen
 aus Spec Kap. 5 S8. Funde:
 1. S8.1 meldete jede Zeile mit `roomStream.` als Treffer, weil der Befehl `Stream\.` suchte.
    Es gibt keine Java-Streams. Der Befehl in der Spec sucht jetzt `\bStream\.`, in einem
