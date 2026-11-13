@@ -716,7 +716,13 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 2: Tests grün sehen** — `mvn -q clean test`
 - [ ] **Schritt 3: Committen** — `docs: Kommentare und README für die Live-Zustellung nachführen`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** `mvn -q clean test` im Wurzelverzeichnis: EXIT 0, 55 Tests
+(chat-service 41, batch-writer 14), 0 Fehler. `grep` fand fünf Stellen mit «web-gateway».
+Angepasst sind die zwei veralteten in `QueueNames` und `RabbitConfig`. Stehen gelassen,
+weil sie vom späteren Gateway sprechen und stimmen: `MessageController` (das Gateway ruft
+`POST /messages` später auf), `ChatMessage` (das Gateway bekommt später eine eigene Kopie
+des Vertrags) und der Kommentar im bestehenden `MessagePublisherIntegrationTest`. README:
+Zeile `chat-service` um `GET /stream` ergänzt. Geprüft hat der Council (KI-Review).
 
 ---
 

@@ -41,7 +41,7 @@ Das Schema der Datenbank entsteht beim ersten Start aus
 
 | Baustein | Technologie | Aufgabe | Stand |
 |---|---|---|---|
-| chat-service | Spring Boot 3, Java 21 | Nimmt Nachrichten per `POST /messages` an, legt sie auf Queue und Fanout-Exchange | vorhanden |
+| chat-service | Spring Boot 3, Java 21 | Nimmt Nachrichten per `POST /messages` an, legt sie auf Queue und Fanout-Exchange. Stellt sie per `GET /stream?roomId=…` (Server-Sent Events) sofort an alle Clients eines Raums zu, auch über mehrere Instanzen | vorhanden |
 | rabbitmq | RabbitMQ 3.13 | Message Queue zwischen den Services | vorhanden |
 | batch-writer | Spring Boot 3, Java 21 | Einziger Schreiber in die Datenbank: holt Nachrichten aus `chat.persist` und schreibt sie stapelweise | vorhanden |
 | postgres | PostgreSQL 17 | Speichert den Chat-Verlauf in der Tabelle `message` | vorhanden |

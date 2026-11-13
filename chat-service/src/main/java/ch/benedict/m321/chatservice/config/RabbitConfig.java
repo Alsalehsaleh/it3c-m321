@@ -60,9 +60,9 @@ public class RabbitConfig {
 
     /**
      * Der Zustellweg. Fanout heisst: JEDE gebundene Queue bekommt eine
-     * Kopie. Das ist genau richtig, weil jede web-gateway-Instanz jede
-     * Nachricht sehen muss — nur sie weiss, welche ihrer WebSocket-Clients
-     * im betroffenen Raum sitzen.
+     * Kopie. Das ist genau richtig, weil jede Instanz des chat-service jede
+     * Nachricht sehen muss — nur sie weiss, welche ihrer SSE-Streams im
+     * betroffenen Raum zuhören (Spec 1.4, 3.2.1).
      */
     @Bean
     public FanoutExchange deliveryExchange() {
