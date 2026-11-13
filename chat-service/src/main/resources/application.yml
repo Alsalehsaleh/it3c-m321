@@ -8,6 +8,19 @@ spring:
     port: 5672
     username: ${RABBITMQ_USER:guest}
     password: ${RABBITMQ_PASSWORD:guest}
+    # Gilt für den einzigen Listener, den DeliveryListener (Spec 4.1).
+    listener:
+      simple:
+        # Genau ein Thread liest die Zustell-Queue. Mit mehreren könnte
+        # Nachricht 6 beim Senden Nachricht 5 überholen (Spec 3.2.1).
+        concurrency: 1
+        max-concurrency: 1
+        # Höchstens 50 unbestätigte Nachrichten beim Listener. Zusammen mit
+        # x-max-length 900 zeigt rabbitmqctl höchstens 950, unter 1000 (S6).
+        prefetch: 50
+        # Eine Nachricht, deren Verarbeitung scheitert, nicht zurücklegen.
+        # Sonst scheitert sie beim nächsten Versuch wieder, endlos (Spec 3.2.6).
+        default-requeue-rejected: false
 
 server:
   port: 8080

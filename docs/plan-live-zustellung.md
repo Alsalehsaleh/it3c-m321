@@ -433,7 +433,15 @@ Co-Authored-By-Zeile.
 - [ ] **Schritt 4: Test grün sehen** — `-Dtest=DeliveryListenerIntegrationTest`
 - [ ] **Schritt 5: Committen** — `feat: DeliveryListener stellt Nachrichten an die Streams ihres Raums zu`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (3 Fehler, der Stream bekam kein Ereignis), danach
+grün: 3 Tests, 0 Fehler; alle 12 Testklassen des `chat-service` grün (33 Tests). Geprüft
+hat der Council (KI-Review) gegen Spec 2.1, 3.1, 3.2.1 und 4.1: `data:` ist Zeichen für
+Zeichen der Body aus `chat.persist` (der Test holt ihn dort ab und vergleicht); Raum B
+bekommt nichts; 50 Nachrichten kommen in Reihenfolge. Der Listener liest mit
+`concurrency 1`, `prefetch 50`, `default-requeue-rejected false`, jeweils mit Kommentar
+in `application.yml`. Korrigiert: nichts. Hinweis: `@Payload` steht ausdrücklich am
+Parameter `ChatMessage`, damit man ohne Spring-Wissen sieht, welcher Parameter
+umgewandelt wird.
 
 ---
 
