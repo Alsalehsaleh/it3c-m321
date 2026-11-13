@@ -152,13 +152,21 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 5: Committen** — `feat: RoomStream hält Puffer und Streams eines Raums`
 
 **Geprüft und korrigiert:** Rot gesehen (Kompilierfehler, `BufferedMessage` fehlt), danach
-grün: 4 Tests, 0 Fehler. Geprüft habe ich und der Council (KI-Review) gegen Spec 2.2, 3.2.5, 3.2.6
+grün: 4 Tests, 0 Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.2, 3.2.5, 3.2.6
 und CLAUDE.md: Ereignis genau `id:<id>`, `data:<body>`, Leerzeile, ohne Leerzeichen; Puffer
 wirft bei 201 die älteste raus; gesendet wird über eine Kopie der Liste, weil das Austragen
 im selben Thread sonst eine `ConcurrentModificationException` gäbe; `IOException` und
 `IllegalStateException` (Stream schon beendet) tragen nur diesen Stream aus. Keine Streams,
 Kommentar über jeder Klasse und Methode. Korrigiert: nichts. `copyOfBuffer()` ist nur
 paketweit sichtbar und dient dem Test; das ist bewusst so gelassen.
+
+Tests selbst ausgeführt mit `mvn -q -pl chat-service test -Dtest=RoomStreamTest`: zuerst rot
+(Kompilierfehler, `BufferedMessage` fehlte), nach dem Code grün (4 Tests).
+
+
+---
+
+## Aufgabe 2: Nachholen nach Last-Event-ID
 
 ---
 
@@ -204,8 +212,9 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Tests grün sehen** — `-Dtest=RoomStreamTest`
 - [ ] **Schritt 5: Committen** — `feat: verpasste Nachrichten nach Last-Event-ID nachholen`
 
+
 **Geprüft und korrigiert:** Rot gesehen (`subscribe` mit zwei Parametern fehlte), danach
-grün: 7 Tests, 0 Fehler. Geprüft habe ich und  der Council (KI-Review) gegen Spec 2.3 und 3.2.5:
+grün: 7 Tests, 0 Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.3 und 3.2.5:
 `subscribe` holt im selben Schloss wie `publish` zuerst nach und trägt erst dann ein; der
 Nahtstellen-Test mit zweitem Thread bekommt 11 bis 200 genau einmal und in Reihenfolge;
 `null`, leer, keine UUID und unbekannte ID ergeben nur eine Log-Zeile und keinen Fehler.
@@ -213,6 +222,9 @@ Korrigiert am Vorschlag: `sendMessage` trug einen kaputten Stream selbst aus. Da
 nicht mehr, weil `subscribe` den Stream beim Nachholen noch gar nicht in der Liste hat.
 Jetzt heisst die Methode `trySend`, gibt `true`/`false` zurück, und der Aufrufer
 entscheidet; die Log-Meldung lautet entsprechend «Dropping» statt «Removing».
+
+Tests selbst ausgeführt mit `-Dtest=RoomStreamTest`: zuerst rot (8 Kompilierfehler,
+`subscribe(SseEmitter, String)` fehlte), nach dem Code grün (7 Tests).
 
 ---
 
@@ -252,13 +264,16 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Test grün sehen** — `-Dtest=RoomStreamRegistryTest`
 - [ ] **Schritt 5: Committen** — `feat: RoomStreamRegistry hält einen RoomStream pro Raum`
 
+
 **Geprüft und korrigiert:** Rot gesehen (`RoomStreamRegistry` fehlte), danach grün: 2 Tests,
-0 Fehler. Geprüft  habe ich und der Council (KI-Review): `getOrCreate` ist `synchronized`, der Test
+0 Fehler. Geprüft hat der Council (KI-Review): `getOrCreate` ist `synchronized`, der Test
 mit zwei gleichzeitigen Threads läuft 200 Mal und bekommt jedes Mal dasselbe Objekt.
 Bewusst `HashMap` mit `synchronized` statt `ConcurrentHashMap.computeIfAbsent` mit Lambda,
 weil es sich laut vorlesen lässt (CLAUDE.md). Das Schloss der Registry hält nur das
 Nachschlagen, gesendet wird ausserhalb. Korrigiert: nichts.
 
+Tests selbst ausgeführt mit `-Dtest=RoomStreamRegistryTest`: zuerst rot (Kompilierfehler,
+`RoomStreamRegistry` fehlte), nach dem Code grün (2 Tests).
 ---
 
 ## Aufgabe 4: StreamController — GET /stream
@@ -306,8 +321,9 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Test grün sehen** — `-Dtest=StreamControllerIntegrationTest`
 - [ ] **Schritt 5: Committen** — `feat: Endpunkt GET /stream öffnet einen SSE-Stream pro Raum`
 
+
 **Geprüft und korrigiert:** Rot gesehen (4 Fehler, überall `404`), danach grün: 4 Tests,
-0 Fehler. Geprüft  habe ich und der Council (KI-Review). Drei Korrekturen, alle im Test:
+0 Fehler. Geprüft hat der Council (KI-Review). Drei Korrekturen, alle im Test:
 1. Der erste grüne Lauf hing. Ursache: Spring schickt die Kopfzeilen eines `SseEmitter` erst
    mit dem ersten Ereignis, der `StreamReader` wartete beim Öffnen aber darauf. Jetzt öffnet
    er asynchron, und der Test publiziert zuerst eine Nachricht. Der Controller blieb gleich.
@@ -318,6 +334,10 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
    Betrieb bleibt `graceful` (Spec 3.2.2).
 Offen benannt: Tomcat protokolliert einen abgerissenen Client zusätzlich als `ERROR` mit
 Stacktrace. Der Dienst behandelt ihn richtig (Stream ausgetragen), das Log ist nur laut.
+
+Tests selbst ausgeführt mit `-Dtest=StreamControllerIntegrationTest` und Docker: zuerst rot
+(4 Fehler, überall `404`). Den ersten Lauf nach dem Code, der hing, habe ich mit Ctrl+C
+abgebrochen. Nach der Korrektur am Test grün (4 Tests).
 
 ---
 
@@ -370,8 +390,9 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
   Tests des `chat-service`: die bestehenden dürfen nicht rot werden.
 - [ ] **Schritt 5: Committen** — `feat: eigene Zustell-Queue pro Instanz an chat.delivery binden`
 
+
 **Geprüft und korrigiert:** Rot gesehen (3 Fehler, kein Bean `deliveryQueue`), danach grün:
-3 Tests, 0 Fehler; alle 11 Testklassen des `chat-service` bleiben grün. Geprüft  habe ich und der
+3 Tests, 0 Fehler; alle 11 Testklassen des `chat-service` bleiben grün. Geprüft hat der
 Council (KI-Review) gegen Spec 3.2.2, 3.2.4 und 4: Die Management-API des Brokers zeigt
 `durable = false`, `auto_delete = true`, `x-expires = 10000`, `x-max-length = 900`,
 `x-overflow = drop-head`, keine Dead-Letter-Route; Name `chat.delivery.<Hostname>.<UUID>`,
@@ -382,6 +403,8 @@ unter Windows `local`. Zwei Korrekturen am Test:
 2. Der erste Lauf nach dem Code war noch rot (Queue im Broker `404`): Spring legt Queues
    erst beim ersten Verbindungsaufbau an. Der Test ruft deshalb `rabbitAdmin.initialize()`
    auf. Im Betrieb öffnet ab Aufgabe 6 der Listener die Verbindung beim Start.
+
+ Am 13.11.2026 ausgeführt mit `-Dtest=DeliveryQueueIntegrationTest`: grün.
 
 ---
 
@@ -435,13 +458,16 @@ Co-Authored-By-Zeile.
 
 **Geprüft und korrigiert:** Rot gesehen (3 Fehler, der Stream bekam kein Ereignis), danach
 grün: 3 Tests, 0 Fehler; alle 12 Testklassen des `chat-service` grün (33 Tests). Geprüft
- habe ich und der Council (KI-Review) gegen Spec 2.1, 3.1, 3.2.1 und 4.1: `data:` ist Zeichen für
+hat der Council (KI-Review) gegen Spec 2.1, 3.1, 3.2.1 und 4.1: `data:` ist Zeichen für
 Zeichen der Body aus `chat.persist` (der Test holt ihn dort ab und vergleicht); Raum B
 bekommt nichts; 50 Nachrichten kommen in Reihenfolge. Der Listener liest mit
 `concurrency 1`, `prefetch 50`, `default-requeue-rejected false`, jeweils mit Kommentar
 in `application.yml`. Korrigiert: nichts. Hinweis: `@Payload` steht ausdrücklich am
 Parameter `ChatMessage`, damit man ohne Spring-Wissen sieht, welcher Parameter
 umgewandelt wird.
+
+Am 13.11.2026 ausgeführt mit `-Dtest=DeliveryListenerIntegrationTest`: grün.
+
 
 ---
 
@@ -496,13 +522,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 **Geprüft und korrigiert:** Grün: 1 Test, 0 Fehler, zwei Instanzen mit den Queues
 `chat.delivery.local.35faa16e-…` und `chat.delivery.local.c747e008-…`. Gegenprobe mit festem
 Queue-Namen ohne UUID: rot («expected: not equal but was: chat.delivery.local»), danach
-zurückgestellt. Geprüft  habe ich und der Council (KI-Review) gegen Spec 3.2.1 und 4: beide A-Streams
+zurückgestellt. Geprüft hat der Council (KI-Review) gegen Spec 3.2.1 und 4: beide A-Streams
 40 Ereignisse, 40 verschiedene ids, pro Absender in Reihenfolge; B-Stream 0. Korrigiert:
 Der erste Lauf startete beide Instanzen auf Port 8080 gegen `localhost:5672`, weil
 `SpringApplicationBuilder.properties(...)` nur Vorgabewerte setzt, die `application.yml`
 überschreibt. Die Werte gehen jetzt als Kommandozeilen-Argumente hinein. Jeder Test startet
 eigene Instanzen (`@BeforeEach`/`@AfterEach`), damit Aufgabe 8 eine schliessen kann, ohne
 andere Tests zu stören.
+
+Am 13.11.2026 ausgeführt mit `-Dtest=TwoInstancesIntegrationTest`: grün.
 
 ---
 
@@ -559,12 +587,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 **Geprüft und korrigiert:** Grün: 3 Tests in `TwoInstancesIntegrationTest`, 0 Fehler. Beide
 Gegenproben rot und danach zurückgestellt: `subscribe` ohne Nachholen → die verpassten
 Nachrichten kommen nie an; ohne `autoDelete` → die Queue von Instanz 2 besteht nach 5 s noch
-(0 Consumer). Geprüft  habe ich und der Council (KI-Review) gegen Spec 2.3, 3.2.2 und 3.2.5: An beiden
+(0 Consumer). Geprüft hat der Council (KI-Review) gegen Spec 2.3, 3.2.2 und 3.2.5: An beiden
 Instanzen genau die 50 verpassten ids in Reihenfolge, danach die neue live, die schon
 gesehene nicht. Korrigiert am Auftrag: Der Plan nannte für S4 eine Zeitgrenze von 15 s. Der
 Test nimmt 5 s, kürzer als `x-expires` (10 s). Mit 15 s wäre die Gegenprobe ohne
 `autoDelete` grün geblieben, weil dann `x-expires` aufgeräumt hätte, und der Test hätte
 nicht gezeigt, welcher Mechanismus wirkt.
+ 
+Am 13.11.2026 ausgeführt mit `-Dtest=TwoInstancesIntegrationTest`: grün.
+
 
 ---
 
@@ -613,13 +644,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 
 **Geprüft und korrigiert:** Rot gesehen (`sendHeartbeat` und `HeartbeatSender` fehlten),
 danach grün: `RoomStreamTest` 9, `HeartbeatSenderTest` 1, `RoomStreamRegistryTest` 2, 0
-Fehler. Geprüft  habe ich und der Council (KI-Review) gegen Spec 2.2 und 3.2.5: Auf der Leitung steht
+Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.2 und 3.2.5: Auf der Leitung steht
 genau `:ping` und eine Leerzeile; das Lebenszeichen landet nicht im Puffer; ein Stream, an
 dem es scheitert, wird ausgetragen; `sendHeartbeat` ist `synchronized` und sendet über eine
 Kopie der Liste. Korrigiert: `trySend` nimmt jetzt ein fertiges Ereignis statt einer
 Nachricht, damit Nachricht und Lebenszeichen denselben Fehlerweg nehmen; das Ereignis einer
 Nachricht baut die neue Methode `messageEvent`. Der `HeartbeatSender` holt die Räume als
 Kopie und hält das Schloss der Registry nicht, während er sendet.
+
+Am 13.11.2026 ausgeführt im Gesamtlauf `mvn -q clean test`: grün.
 
 ---
 
@@ -671,13 +704,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 
 **Geprüft und korrigiert:** Rot gesehen («Warnung fehlt im Log»; im Log stand eine
 `NullPointerException` für die Nachricht ohne `id`), danach grün: 4 Tests, 0 Fehler. Geprüft
- habe ich und der Council (KI-Review) gegen Spec 3.2.6: Kaputtes JSON lehnt Spring beim Umwandeln ab
+hat der Council (KI-Review) gegen Spec 3.2.6: Kaputtes JSON lehnt Spring beim Umwandeln ab
 (`MessageConversionException`), JSON ohne `roomId` und ohne `id` ergibt je eine Warnung
 «Ignoring message without id or roomId»; keine wird zugestellt, die Zustell-Queue ist danach
 leer, und eine gültige Nachricht kommt normal an. Korrigiert am Plan: Der Test sendet
 zusätzlich eine Nachricht **ohne `id`** in einen Raum mit offenem Stream. Nur dieser Fall
 erzeugte wirklich eine `NullPointerException`; ohne `roomId` landete die Nachricht
 unbemerkt im Raum `null` der `HashMap`. Beides fängt jetzt die Prüfung im Listener ab.
+
+Am 13.11.2026 ausgeführt mit `-Dtest=DeliveryListenerIntegrationTest`: grün.
 
 ---
 
@@ -722,8 +757,9 @@ Angepasst sind die zwei veralteten in `QueueNames` und `RabbitConfig`. Stehen ge
 weil sie vom späteren Gateway sprechen und stimmen: `MessageController` (das Gateway ruft
 `POST /messages` später auf), `ChatMessage` (das Gateway bekommt später eine eigene Kopie
 des Vertrags) und der Kommentar im bestehenden `MessagePublisherIntegrationTest`. README:
-Zeile `chat-service` um `GET /stream` ergänzt. Geprüft  habe ich und der Council (KI-Review).
+Zeile `chat-service` um `GET /stream` ergänzt. Geprüft hat der Council (KI-Review).
 
+Am 13.11.2026 selbst ausgeführt: `mvn -q clean test` im Wurzelverzeichnis, grün.
 ---
 
 ## Aufgabe 12: Durchsicht nach CLAUDE.md (S8)
@@ -772,6 +808,8 @@ aus Spec Kap. 5 S8. Funde:
 Ausserdem ein veralteter Kommentar im `MessagePublisherIntegrationTest` («Wir spielen ein
 web-gateway»). Danach alle drei Befehle ohne Ausgabe, `mvn -q clean test` EXIT 0, 55 Tests.
 
+Am 13.11.2026 selbst ausgeführt: `mvn -q clean test` im Wurzelverzeichnis, grün.
+
 ---
 
 ## Änderungen am Plan
@@ -803,7 +841,7 @@ Alle acht Szenarien mit den Befehlen aus Spec Kap. 5, in dieser Reihenfolge, auf
 
 Gemessen am 13.11.2026 auf einem **frischen Klon von GitHub** (Commit `0cb0c1f`) mit `.env`
 aus `.env.example`, Szenarien in dieser Reihenfolge auf demselben Stack, mit den Befehlen aus
-Spec Kap. 5. Ausgeführt vom Council (KI) über ein lokales Hilfsskript auf meinem Rechner
+Spec Kap. 5. Ausgeführt  über ein lokales Hilfsskript auf meinem Rechner
 (Docker Desktop, Git Bash).
 
 | Szenario | Erwartet | Gemessen | |
