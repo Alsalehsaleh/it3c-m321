@@ -796,3 +796,23 @@ Alle acht Szenarien mit den Befehlen aus Spec Kap. 5, in dieser Reihenfolge, auf
 - [ ] S7 Neuverbindung — erwartet: an beiden Instanzen genau die 50, danach live
 - [ ] S8 Quelltext — erwartet: keine Ausgabe der Prüfbefehle, `.env` nicht im Repo
 - [ ] Tag `bewertung-2` gesetzt und gepusht
+
+---
+
+## Ergebnis der Abschluss-Prüfung
+
+Gemessen am 13.11.2026 auf einem **frischen Klon von GitHub** (Commit `0cb0c1f`) mit `.env`
+aus `.env.example`, Szenarien in dieser Reihenfolge auf demselben Stack, mit den Befehlen aus
+Spec Kap. 5. Ausgeführt vom Council (KI) über ein lokales Hilfsskript auf meinem Rechner
+(Docker Desktop, Git Bash).
+
+| Szenario | Erwartet | Gemessen | |
+|---|---|---|---|
+| S1 `mvn -q clean test` | ein Lauf, alles grün | EXIT 0, 55 Tests (chat-service 41, batch-writer 14), 0 Fehler | bestanden |
+| S2 frischer Klon, `up -d --build` | alle Dienste laufen, kein Port | 4 Dienste laufen, `postgres` und `rabbitmq` healthy; 0 Ports mit `->`; kein `ports:` | bestanden |
+| S3 zwei Instanzen | beide A-Clients 400, je einmal, pro Absender in Reihenfolge; B 0 | 2 Zustell-Queues je 1 Consumer, 2 Bindungen; A an I1: 400 / 400 ids, anna und ben je 200 in Reihenfolge; A an I2: dasselbe; B: 0 | bestanden |
+| S4 zurück auf eine Instanz | nach ≤ 30 s eine Queue; `chat.persist`, `chat.dlq` bleiben | Scale dauerte 11 s, nach 13 s eine Queue (die der übrigen Instanz), 1 Bindung; `chat.persist` und `chat.dlq` vorhanden | bestanden |
+| S5 ohne Postgres und batch-writer | 100 nach ≤ 5 s im Stream; danach 100 in der Tabelle | 100 im Stream 5 s nach dem letzten POST; 100 neue Zeilen nach dem Neustart | bestanden |
+| S6 eine Instanz pausiert, 5000 Nachrichten | Queue nie über 1000; gesunder Client 5000; danach wieder Zustellung | höchste Tiefe 950 (900 + Prefetch 50, wie Spec 3.2.4); gesunder Client 5000 in Reihenfolge; nach dem Fortsetzen 2 Queues je 1 Consumer, pausierte Instanz stellt wieder zu | bestanden |
+| S7 Neuverbindung mit `Last-Event-ID` | genau die 50 fehlenden, in Reihenfolge, keine doppelt, danach live | an derselben und an der anderen Instanz je 51 Ereignisse, 51 ids: die 50 verpassten in Reihenfolge, dann die neue live; die schon gesehene nicht | bestanden |
+| S8 Quelltext | keine Streams, Kommentar über jeder Klasse und Methode; `.env` nicht im Repo | alle drei Befehle aus Spec Kap. 5 S8 ohne Ausgabe; `.env` nicht versioniert, in `.gitignore` | bestanden |
