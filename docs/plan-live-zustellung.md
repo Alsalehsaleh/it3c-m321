@@ -151,7 +151,14 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Test grün sehen** — `-Dtest=RoomStreamTest`
 - [ ] **Schritt 5: Committen** — `feat: RoomStream hält Puffer und Streams eines Raums`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (Kompilierfehler, `BufferedMessage` fehlt), danach
+grün: 4 Tests, 0 Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.2, 3.2.5, 3.2.6
+und CLAUDE.md: Ereignis genau `id:<id>`, `data:<body>`, Leerzeile, ohne Leerzeichen; Puffer
+wirft bei 201 die älteste raus; gesendet wird über eine Kopie der Liste, weil das Austragen
+im selben Thread sonst eine `ConcurrentModificationException` gäbe; `IOException` und
+`IllegalStateException` (Stream schon beendet) tragen nur diesen Stream aus. Keine Streams,
+Kommentar über jeder Klasse und Methode. Korrigiert: nichts. `copyOfBuffer()` ist nur
+paketweit sichtbar und dient dem Test; das ist bewusst so gelassen.
 
 ---
 
