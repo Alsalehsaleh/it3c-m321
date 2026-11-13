@@ -204,7 +204,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Tests grün sehen** — `-Dtest=RoomStreamTest`
 - [ ] **Schritt 5: Committen** — `feat: verpasste Nachrichten nach Last-Event-ID nachholen`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (`subscribe` mit zwei Parametern fehlte), danach
+grün: 7 Tests, 0 Fehler. Geprüft hat der Council (KI-Review) gegen Spec 2.3 und 3.2.5:
+`subscribe` holt im selben Schloss wie `publish` zuerst nach und trägt erst dann ein; der
+Nahtstellen-Test mit zweitem Thread bekommt 11 bis 200 genau einmal und in Reihenfolge;
+`null`, leer, keine UUID und unbekannte ID ergeben nur eine Log-Zeile und keinen Fehler.
+Korrigiert am Vorschlag: `sendMessage` trug einen kaputten Stream selbst aus. Das passte
+nicht mehr, weil `subscribe` den Stream beim Nachholen noch gar nicht in der Liste hat.
+Jetzt heisst die Methode `trySend`, gibt `true`/`false` zurück, und der Aufrufer
+entscheidet; die Log-Meldung lautet entsprechend «Dropping» statt «Removing».
 
 ---
 

@@ -39,12 +39,31 @@ public class RoomStream {
         addToBuffer(message);
         List<SseEmitter> receivers = new ArrayList<>(emitters);
         for (SseEmitter emitter : receivers) {
-            sendMessage(emitter, message);
+            boolean sent = trySend(emitter, message);
+            if (!sent) {
+                emitters.remove(emitter);
+            }
         }
     }
 
-    /** Meldet einen Stream an. Ab jetzt bekommt er jede neue Nachricht des Raums. */
-    public synchronized void subscribe(SseEmitter emitter) {
+    /**
+     * Meldet einen Stream an: zuerst die verpassten Nachrichten nach
+     * lastEventId aus dem Puffer, DANN in die Liste eintragen.
+     *
+     * Weil publish dasselbe Schloss hat, liegt jede Nachricht entweder schon
+     * im Puffer und wird hier nachgeholt, oder sie kommt erst danach und geht
+     * live an den eingetragenen Stream. Beides oder keins ist unmöglich
+     * (Spec 3.2.5). Andersherum, erst eintragen und dann nachholen, könnte
+     * eine Live-Nachricht vor den nachgeholten ankommen.
+     */
+    public synchronized void subscribe(SseEmitter emitter, String lastEventId) {
+        List<BufferedMessage> missedMessages = messagesAfter(lastEventId);
+        for (BufferedMessage message : missedMessages) {
+            boolean sent = trySend(emitter, message);
+            if (!sent) {
+                return;
+            }
+        }
         emitters.add(emitter);
     }
 
@@ -73,24 +92,55 @@ public class RoomStream {
     }
 
     /**
-     * Schickt eine Nachricht an einen Stream: id ist die id der Nachricht,
-     * data der unveränderte Body.
+     * Alle Nachrichten im Puffer, die NACH der Nachricht mit lastEventId kamen.
      *
-     * Ein Fehler betrifft nur diesen einen Stream. Er wird ausgetragen, und
-     * keine Exception verlässt die Methode. Sonst würde der Listener die
-     * Nachricht zurück in die Queue legen und alle anderen Streams bekämen
-     * sie nie (Spec 3.2.6).
+     * Fehlt die ID, ist sie leer oder steht sie nicht im Puffer (zu alt,
+     * anderer Raum, Instanz neu gestartet, keine UUID), gibt es nichts
+     * nachzuholen. Das ist kein Fehler: Ein Fehler würde den Browser für immer
+     * aussperren, weil er mit derselben ID neu verbindet (Spec 2.3).
      */
-    private void sendMessage(SseEmitter emitter, BufferedMessage message) {
+    private List<BufferedMessage> messagesAfter(String lastEventId) {
+        List<BufferedMessage> missedMessages = new ArrayList<>();
+        if (lastEventId == null || lastEventId.isBlank()) {
+            return missedMessages;
+        }
+        boolean found = false;
+        for (BufferedMessage message : buffer) {
+            if (found) {
+                missedMessages.add(message);
+            }
+            String messageId = message.id().toString();
+            if (messageId.equals(lastEventId)) {
+                found = true;
+            }
+        }
+        if (!found) {
+            log.info("Last-Event-ID {} not in buffer, starting live", lastEventId);
+        }
+        return missedMessages;
+    }
+
+    /**
+     * Schickt eine Nachricht an einen Stream: id ist die id der Nachricht,
+     * data der unveränderte Body. Gibt zurück, ob es geklappt hat.
+     *
+     * Ein Fehler betrifft nur diesen einen Stream, und keine Exception
+     * verlässt die Methode. Sonst würde der Listener die Nachricht zurück in
+     * die Queue legen und alle anderen Streams bekämen sie nie (Spec 3.2.6).
+     * Austragen muss der Aufrufer, denn nur er weiss, ob der Stream schon in
+     * der Liste steht.
+     */
+    private boolean trySend(SseEmitter emitter, BufferedMessage message) {
         String eventId = message.id().toString();
         SseEmitter.SseEventBuilder event = SseEmitter.event();
         event.id(eventId);
         event.data(message.body());
         try {
             emitter.send(event);
+            return true;
         } catch (IOException | IllegalStateException exception) {
-            log.info("Removing stream after failed send: {}", exception.getMessage());
-            emitters.remove(emitter);
+            log.info("Dropping stream after failed send: {}", exception.getMessage());
+            return false;
         }
     }
 }
