@@ -669,7 +669,15 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Tests grün sehen** — `-Dtest=DeliveryListenerIntegrationTest`
 - [ ] **Schritt 5: Committen** — `feat: ungültige Nachrichten in der Zustell-Queue verwerfen`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen («Warnung fehlt im Log»; im Log stand eine
+`NullPointerException` für die Nachricht ohne `id`), danach grün: 4 Tests, 0 Fehler. Geprüft
+hat der Council (KI-Review) gegen Spec 3.2.6: Kaputtes JSON lehnt Spring beim Umwandeln ab
+(`MessageConversionException`), JSON ohne `roomId` und ohne `id` ergibt je eine Warnung
+«Ignoring message without id or roomId»; keine wird zugestellt, die Zustell-Queue ist danach
+leer, und eine gültige Nachricht kommt normal an. Korrigiert am Plan: Der Test sendet
+zusätzlich eine Nachricht **ohne `id`** in einen Raum mit offenem Stream. Nur dieser Fall
+erzeugte wirklich eine `NullPointerException`; ohne `roomId` landete die Nachricht
+unbemerkt im Raum `null` der `HashMap`. Beides fängt jetzt die Prüfung im Listener ab.
 
 ---
 

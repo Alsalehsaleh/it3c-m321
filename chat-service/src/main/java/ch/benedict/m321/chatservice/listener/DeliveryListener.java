@@ -38,11 +38,20 @@ public class DeliveryListener {
      * Die Nachricht kommt zweimal herein: als ChatMessage, um id und roomId zu
      * lesen, und als rohe Message, deren Body unverändert in data: geht. Neu in
      * JSON geschrieben wird nichts (Spec 2.1).
+     *
+     * Fehlt id oder roomId, wird die Nachricht mit einer Warnung verworfen:
+     * normal zurückkehren heisst "bestätigt". Ohne diese Prüfung liefe eine
+     * NullPointerException durch die Methode. Kaputtes JSON kommt gar nicht
+     * bis hierher, das lehnt Spring schon beim Umwandeln ab (Spec 3.2.6).
      */
     @RabbitListener(queues = "#{deliveryQueue.name}")
     public void onMessage(@Payload ChatMessage chatMessage, Message rawMessage) {
         byte[] bodyBytes = rawMessage.getBody();
         String body = new String(bodyBytes, StandardCharsets.UTF_8);
+        if (chatMessage.id() == null || chatMessage.roomId() == null) {
+            log.warn("Ignoring message without id or roomId: {}", body);
+            return;
+        }
         BufferedMessage bufferedMessage = new BufferedMessage(chatMessage.id(), body);
         RoomStream roomStream = roomStreamRegistry.getOrCreate(chatMessage.roomId());
         roomStream.publish(bufferedMessage);

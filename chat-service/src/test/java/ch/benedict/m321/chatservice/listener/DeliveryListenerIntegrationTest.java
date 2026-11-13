@@ -7,10 +7,18 @@ import ch.benedict.m321.chatservice.support.StreamReader;
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.amqp.core.Message;
+import org.springframework.amqp.core.MessageProperties;
+import org.springframework.amqp.core.Queue;
+import org.springframework.amqp.core.QueueInformation;
+import org.springframework.amqp.rabbit.core.RabbitAdmin;
 import org.springframework.amqp.rabbit.core.RabbitTemplate;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.boot.test.system.CapturedOutput;
+import org.springframework.boot.test.system.OutputCaptureExtension;
 import org.springframework.boot.test.web.server.LocalServerPort;
 import org.springframework.boot.testcontainers.service.connection.ServiceConnection;
 import org.testcontainers.containers.RabbitMQContainer;
@@ -29,6 +37,7 @@ import java.util.List;
 import java.util.UUID;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -43,6 +52,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
         webEnvironment = SpringBootTest.WebEnvironment.RANDOM_PORT,
         properties = "server.shutdown=immediate")
 @Testcontainers
+@ExtendWith(OutputCaptureExtension.class)
 class DeliveryListenerIntegrationTest {
 
     private static final Duration TIMEOUT = Duration.ofSeconds(10);
@@ -62,6 +72,13 @@ class DeliveryListenerIntegrationTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @Autowired
+    private RabbitAdmin rabbitAdmin;
+
+    @Autowired
+    @Qualifier("deliveryQueue")
+    private Queue deliveryQueue;
 
     /**
      * Eine Nachricht für Raum A erscheint im Stream von Raum A und nicht in dem
@@ -124,6 +141,54 @@ class DeliveryListenerIntegrationTest {
         reader.close();
         assertTrue(lastArrived);
         assertEquals(sentIds, receivedIds);
+    }
+
+    /**
+     * Ungültige Nachrichten direkt am Exchange chat.delivery: kaputtes JSON, JSON
+     * ohne roomId und JSON ohne id. Keine wird zugestellt, keine bleibt in der
+     * Queue, und für die beiden ohne Feld steht eine Warnung im Log statt einer
+     * NullPointerException. Eine gültige Nachricht danach kommt normal an: Der
+     * Listener läuft weiter (Spec 3.2.6).
+     */
+    @Test
+    void invalidMessagesAreDroppedWithWarningAndListenerKeepsRunning(CapturedOutput output) throws Exception {
+        UUID roomId = UUID.randomUUID();
+        StreamReader reader = openStream(roomId);
+        String withoutRoomId = "{\"id\":\"" + UUID.randomUUID() + "\",\"senderId\":\"anna\","
+                + "\"senderName\":\"Anna\",\"content\":\"ohne Raum\",\"sentAt\":\"2026-11-13T10:00:00Z\"}";
+        String withoutId = "{\"roomId\":\"" + roomId + "\",\"senderId\":\"anna\","
+                + "\"senderName\":\"Anna\",\"content\":\"ohne id\",\"sentAt\":\"2026-11-13T10:00:00Z\"}";
+
+        sendRawToDeliveryExchange("das ist kein JSON");
+        sendRawToDeliveryExchange(withoutRoomId);
+        sendRawToDeliveryExchange(withoutId);
+        String validId = postMessage(roomId, "gueltig");
+
+        boolean validArrived = reader.waitForLine("id:" + validId, TIMEOUT);
+        List<String> lines = reader.lines();
+        reader.close();
+        int waitingInQueue = messagesWaitingInDeliveryQueue();
+        String log = output.getAll();
+        assertTrue(validArrived);
+        assertEquals(1, countDataLines(lines));
+        assertEquals(0, waitingInQueue);
+        assertTrue(log.contains("Ignoring message without id or roomId"), "Warnung fehlt im Log");
+        assertFalse(log.contains("NullPointerException"), "NullPointerException im Log");
+    }
+
+    /** Legt einen Body ohne Umweg über den chat-service an den Fanout-Exchange. */
+    private void sendRawToDeliveryExchange(String body) {
+        MessageProperties properties = new MessageProperties();
+        properties.setContentType(MessageProperties.CONTENT_TYPE_JSON);
+        byte[] bodyBytes = body.getBytes(StandardCharsets.UTF_8);
+        Message message = new Message(bodyBytes, properties);
+        rabbitTemplate.send(QueueNames.DELIVERY_EXCHANGE, "", message);
+    }
+
+    /** Wie viele Nachrichten in der Zustell-Queue dieser Instanz warten. */
+    private int messagesWaitingInDeliveryQueue() {
+        QueueInformation information = rabbitAdmin.getQueueInfo(deliveryQueue.getName());
+        return information.getMessageCount();
     }
 
     /** Öffnet einen Stream und wartet, bis der Dienst ihn angemeldet hat. */
