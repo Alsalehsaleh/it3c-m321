@@ -370,7 +370,18 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
   Tests des `chat-service`: die bestehenden dürfen nicht rot werden.
 - [ ] **Schritt 5: Committen** — `feat: eigene Zustell-Queue pro Instanz an chat.delivery binden`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (3 Fehler, kein Bean `deliveryQueue`), danach grün:
+3 Tests, 0 Fehler; alle 11 Testklassen des `chat-service` bleiben grün. Geprüft hat der
+Council (KI-Review) gegen Spec 3.2.2, 3.2.4 und 4: Die Management-API des Brokers zeigt
+`durable = false`, `auto_delete = true`, `x-expires = 10000`, `x-max-length = 900`,
+`x-overflow = drop-head`, keine Dead-Letter-Route; Name `chat.delivery.<Hostname>.<UUID>`,
+unter Windows `local`. Zwei Korrekturen am Test:
+1. Statt «eine Nachricht landet in der Queue» prüft der Test die **Bindung** über die
+   Management-API. Ab Aufgabe 6 liest der Listener die Queue leer, eine Zählung der
+   Nachrichten würde dann zufällig scheitern. Die Bindung beweist dasselbe.
+2. Der erste Lauf nach dem Code war noch rot (Queue im Broker `404`): Spring legt Queues
+   erst beim ersten Verbindungsaufbau an. Der Test ruft deshalb `rabbitAdmin.initialize()`
+   auf. Im Betrieb öffnet ab Aufgabe 6 der Listener die Verbindung beim Start.
 
 ---
 

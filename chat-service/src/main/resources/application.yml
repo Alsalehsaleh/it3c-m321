@@ -16,3 +16,9 @@ logging:
   level:
     # Im Unterricht wollen wir jeden Schritt sehen.
     ch.benedict.m321: DEBUG
+
+instance:
+  # Teil des Namens der Zustell-Queue (Spec 4). Docker setzt HOSTNAME in jedem
+  # Container auf die kurze Container-ID. Ausserhalb von Docker, etwa unter
+  # Windows, fehlt die Variable, dann steht hier "local".
+  hostname: ${HOSTNAME:local}
