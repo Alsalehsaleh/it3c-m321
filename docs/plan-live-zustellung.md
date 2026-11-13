@@ -252,7 +252,12 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Test grün sehen** — `-Dtest=RoomStreamRegistryTest`
 - [ ] **Schritt 5: Committen** — `feat: RoomStreamRegistry hält einen RoomStream pro Raum`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (`RoomStreamRegistry` fehlte), danach grün: 2 Tests,
+0 Fehler. Geprüft hat der Council (KI-Review): `getOrCreate` ist `synchronized`, der Test
+mit zwei gleichzeitigen Threads läuft 200 Mal und bekommt jedes Mal dasselbe Objekt.
+Bewusst `HashMap` mit `synchronized` statt `ConcurrentHashMap.computeIfAbsent` mit Lambda,
+weil es sich laut vorlesen lässt (CLAUDE.md). Das Schloss der Registry hält nur das
+Nachschlagen, gesendet wird ausserhalb. Korrigiert: nichts.
 
 ---
 
