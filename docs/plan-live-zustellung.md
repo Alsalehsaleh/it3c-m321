@@ -306,7 +306,18 @@ Nicht committen, bis ich es geprüft habe. Danach Commit-Message:
 - [ ] **Schritt 4: Test grün sehen** — `-Dtest=StreamControllerIntegrationTest`
 - [ ] **Schritt 5: Committen** — `feat: Endpunkt GET /stream öffnet einen SSE-Stream pro Raum`
 
-**Geprüft und korrigiert:**
+**Geprüft und korrigiert:** Rot gesehen (4 Fehler, überall `404`), danach grün: 4 Tests,
+0 Fehler. Geprüft hat der Council (KI-Review). Drei Korrekturen, alle im Test:
+1. Der erste grüne Lauf hing. Ursache: Spring schickt die Kopfzeilen eines `SseEmitter` erst
+   mit dem ersten Ereignis, der `StreamReader` wartete beim Öffnen aber darauf. Jetzt öffnet
+   er asynchron, und der Test publiziert zuerst eine Nachricht. Der Controller blieb gleich.
+2. Für den Test «geschlossener Stream wird ausgetragen» kam `RoomStream.openStreamCount()`
+   dazu, schon mit dem Test, damit «rot» am fehlenden Endpunkt lag und nicht am Kompilieren.
+3. Am Ende wartete Spring wegen `graceful` Shutdown 30 s auf offene Streams, und Surefire
+   beendete die JVM hart. Nur in diesem Test gilt jetzt `server.shutdown=immediate`; im
+   Betrieb bleibt `graceful` (Spec 3.2.2).
+Offen benannt: Tomcat protokolliert einen abgerissenen Client zusätzlich als `ERROR` mit
+Stacktrace. Der Dienst behandelt ihn richtig (Stream ausgetragen), das Log ist nur laut.
 
 ---
 

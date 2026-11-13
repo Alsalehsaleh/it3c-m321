@@ -76,6 +76,14 @@ public class RoomStream {
     }
 
     /**
+     * Wie viele Streams dem Raum gerade zuhören. Für Tests und zur Kontrolle,
+     * ob ausgetragene Streams wirklich weg sind (Spec 3.2.6).
+     */
+    public synchronized int openStreamCount() {
+        return emitters.size();
+    }
+
+    /**
      * Eine Kopie des Puffers, älteste Nachricht zuerst. Nur zum Nachsehen,
      * etwa im Test: Wer die Kopie verändert, verändert den Puffer nicht.
      */
